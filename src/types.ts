@@ -13,7 +13,7 @@ export interface PriceAlert { id: string; secid: string; metric: AlertMetric; th
 export interface TodoItem { id: string; text: string; tag: string; completed: boolean; createdAt: string; completedAt?: string }
 export interface TodoLog { id: string; savedAt: string; items: TodoItem[] }
 export interface Settings {
-  refreshMs: number; idleRefreshMs: number; opacity: number; colorMode: 'cn' | 'global'; shortcut: string; hideShortcut: string;
+  refreshMs: number; idleRefreshMs: number; opacity: number; colorMode: 'cn' | 'global'; tickerShortcut: string; notesShortcut: string; hideShortcut: string;
   notifications: boolean; launchAtLogin: boolean; locked: boolean; paused: boolean;
 }
 export interface AppState { watchlist: WatchItem[]; alerts: PriceAlert[]; todos: string; todoItems: TodoItem[]; todoLogs: TodoLog[]; settings: Settings; windowBounds?: { x: number; y: number; width: number; height: number } }
@@ -24,7 +24,7 @@ export interface MarketFloatAPI {
   fetchQuotes(items: WatchItem[]): Promise<Quote[]>; fetchDetail(item: WatchItem): Promise<DetailData>;
   searchStocks(query: string): Promise<SearchResult[]>; toggleDecoy(): Promise<boolean>; setDecoy(value: boolean): Promise<boolean>;
   setWindowOpacity(value: number): Promise<void>; setWindowLocked(value: boolean): Promise<void>;
-  updateShortcut(value: string, hideValue: string): Promise<{ ok: boolean; error?: string }>; setLaunchAtLogin(value: boolean): Promise<void>;
+  updateShortcut(tickerValue: string, notesValue: string, hideValue: string): Promise<{ ok: boolean; error?: string }>; setLaunchAtLogin(value: boolean): Promise<void>;
   notify(title: string, body: string): Promise<void>; hideWindow(): Promise<void>; quit(): Promise<void>;
   onDecoyChanged(callback: (value: boolean) => void): () => void;
 }

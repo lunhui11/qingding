@@ -15,15 +15,15 @@
 .todo-check { appearance: none; width: 18px; height: 18px; border: 1.5px solid #91a49b; border-radius: 50%; cursor: pointer; display: grid; place-items: center; }
 .todo-check:checked { background: #78a291; border-color: #78a291; }
 .todo-check:checked::after { content: '✓'; color: white; font-size: 12px; }
-.todo-delete { visibility: hidden; border: 0; background: none; color: #a98a8a; cursor: pointer; font-size: 15px; }
-.todo-row:hover .todo-delete { visibility: visible; }
+.todo-delete { border: 0; background: none; color: #a98a8a; cursor: pointer; font-size: 15px; }
 .todo-add { border: 0; background: none; color: #729184; padding: 10px 2px; text-align: left; font-size: 11px; cursor: pointer; display: flex; gap: 4px; align-items: center; }
 .decoy-actions { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #dde2de; padding-top: 10px; }
 .decoy-actions span { font-size: 9px; color: #929b97; }
 .decoy-actions button { border: 0; background: #dce8e3; color: #587568; border-radius: 5px; padding: 7px 10px; font-size: 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
 .log-list { flex: 1; overflow-y: auto; margin: 15px 0; }
 .log-card { background: #fff; border: 1px solid #e0e4e1; border-radius: 7px; padding: 10px; margin-bottom: 8px; }
-.log-card header { display: flex; justify-content: space-between; font-size: 10px; color: #77827d; margin-bottom: 7px; }
+.log-card header { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; font-size: 10px; color: #77827d; margin-bottom: 7px; }
+.log-card header button { border: 0; background: none; color: #a57b7b; cursor: pointer; padding: 2px; }
 .log-card p { font-size: 10px; margin: 4px 0; color: #4c5852; }
 .log-card p.done { text-decoration: line-through; color: #99a29d; }
 .log-empty { display: grid; place-items: center; height: 70%; color: #99a29d; font-size: 11px; }

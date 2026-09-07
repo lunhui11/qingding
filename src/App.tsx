@@ -7,7 +7,7 @@ import TitleBar from './components/TitleBar'
 import Decoy from './components/Decoy'
 import SettingsPanel from './components/SettingsPanel'
 
-const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, colorMode: 'cn', shortcut: 'CommandOrControl+Alt+M', hideShortcut: 'CommandOrControl+Alt+H', notifications: true, launchAtLogin: false, locked: false, paused: false } }
+const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, launchAtLogin: false, locked: false, paused: false } }
 
 export default function App() {
   const [state, setState] = useState<AppState>(fallbackState)
@@ -73,11 +73,11 @@ export default function App() {
   }
   const updateSettings = async (settings: AppState['settings']) => {
     setState(s => ({ ...s, settings })); await save({ settings }); window.marketFloat.setWindowOpacity(settings.opacity); window.marketFloat.setWindowLocked(settings.locked); window.marketFloat.setLaunchAtLogin(settings.launchAtLogin)
-    const result = await window.marketFloat.updateShortcut(settings.shortcut, settings.hideShortcut); setShortcutError(result.error)
+    const result = await window.marketFloat.updateShortcut(settings.tickerShortcut, settings.notesShortcut, settings.hideShortcut); setShortcutError(result.error)
   }
   const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} 更新` : '正在连接'
 
-  if (decoy) return <Decoy items={state.todoItems} logs={state.todoLogs} onItemsChange={(todoItems: TodoItem[]) => save({ todoItems })} onSaveLog={(log: TodoLog) => save({ todoLogs: [log, ...state.todoLogs].slice(0, 180) })}/>
+  if (decoy) return <Decoy items={state.todoItems} logs={state.todoLogs} tickerShortcut={state.settings.tickerShortcut} onItemsChange={(todoItems: TodoItem[]) => save({ todoItems })} onLogsChange={(todoLogs: TodoLog[]) => save({ todoLogs })} onSaveLog={(log: TodoLog) => save({ todoLogs: [log, ...state.todoLogs].slice(0, 180) })}/>
   return <div className="app-shell">
     <TitleBar locked={state.settings.locked} status={status} onLock={() => updateSettings({ ...state.settings, locked: !state.settings.locked })} onSettings={() => setSettingsOpen(true)} onHide={() => window.marketFloat.hideWindow()}/>
     <div className="toolbar">

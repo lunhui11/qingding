@@ -45,12 +45,13 @@ function scheduleSaveBounds() {
   clearTimeout(saveBoundsTimer); saveBoundsTimer = setTimeout(() => { if (win && !win.isMaximized()) patchState({ windowBounds: win.getBounds() }) }, 300)
 }
 
-function registerShortcuts(decoyAccelerator: string, hideAccelerator: string) {
+function registerShortcuts(tickerAccelerator: string, notesAccelerator: string, hideAccelerator: string) {
   globalShortcut.unregisterAll()
   try {
-    const decoyOk = globalShortcut.register(decoyAccelerator, toggleDecoy)
+    const tickerOk = globalShortcut.register(tickerAccelerator, () => { if (!win?.isVisible()) win?.show(); win?.focus(); setDecoy(false) })
+    const notesOk = globalShortcut.register(notesAccelerator, () => { if (!win?.isVisible()) win?.show(); win?.focus(); setDecoy(true) })
     const hideOk = globalShortcut.register(hideAccelerator, () => { if (!win) return; if (win.isVisible()) win.hide(); else { win.show(); win.focus() } })
-    if (!decoyOk || !hideOk) { globalShortcut.unregisterAll(); return false }
+    if (!tickerOk || !notesOk || !hideOk) { globalShortcut.unregisterAll(); return false }
     return true
   } catch { globalShortcut.unregisterAll(); return false }
 }
@@ -83,14 +84,14 @@ function setupIpc() {
   ipcMain.handle('window:set-decoy', (_, value) => setDecoy(Boolean(value)))
   ipcMain.handle('window:opacity', (_, value) => win?.setOpacity(Math.min(1, Math.max(0.55, Number(value)))))
   ipcMain.handle('window:locked', (_, value) => { win?.setMovable(!value); win?.setResizable(!value) })
-  ipcMain.handle('shortcut:update', (_, value, hideValue) => { const ok = registerShortcuts(String(value), String(hideValue)); return ok ? { ok: true } : { ok: false, error: '其中一个快捷键已被其他程序占用' } })
+  ipcMain.handle('shortcut:update', (_, tickerValue, notesValue, hideValue) => { const ok = registerShortcuts(String(tickerValue), String(notesValue), String(hideValue)); return ok ? { ok: true } : { ok: false, error: '其中一个快捷键已被其他程序占用' } })
   ipcMain.handle('app:launch-at-login', (_, value) => app.setLoginItemSettings({ openAtLogin: Boolean(value), path: process.execPath }))
   ipcMain.handle('notify', (_, title, body) => { if (Notification.isSupported()) new Notification({ title, body, silent: true }).show() })
   ipcMain.handle('window:hide', () => win?.hide())
   ipcMain.handle('app:quit', () => { quitting = true; app.quit() })
 }
 
-app.whenReady().then(() => { setupIpc(); createWindow(); createTray(); const s = getState().settings; registerShortcuts(s.shortcut, s.hideShortcut) })
+app.whenReady().then(() => { setupIpc(); createWindow(); createTray(); const s = getState().settings; registerShortcuts(s.tickerShortcut, s.notesShortcut, s.hideShortcut) })
 app.on('activate', () => win ? win.show() : createWindow())
 app.on('before-quit', () => { quitting = true; globalShortcut.unregisterAll() })
 app.on('window-all-closed', () => { /* tray application remains active until explicit quit */ })
