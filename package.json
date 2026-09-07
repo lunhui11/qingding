@@ -1,0 +1,45 @@
+{
+  "name": "market-float",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A discreet A-share and Hong Kong stock ticker for Windows",
+  "main": "dist-electron/main.js",
+  "author": "Codex",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"tsc -p tsconfig.main.json --watch\" \"wait-on tcp:5173 dist-electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "build": "tsc -p tsconfig.main.json && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
+    "dist": "npm run build && electron-builder --win portable"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "electron-store": "^8.2.0",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "concurrently": "latest",
+    "cross-env": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "typescript": "latest",
+    "vitest": "latest",
+    "wait-on": "latest"
+  },
+  "build": {
+    "appId": "cn.codex.marketfloat",
+    "productName": "轻盯",
+    "asar": true,
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
+    "win": { "target": ["portable"], "artifactName": "轻盯-便携版-${version}.${ext}" },
+    "portable": { "artifactName": "轻盯-便携版-${version}.${ext}" }
+  }
+}

@@ -1,0 +1,3 @@
+.existing-alerts input { accent-color: var(--teal); }
+.existing-alerts span { flex: 1; }
+.existing-alerts button { border: 0; background: none; color: #9b6469; cursor: pointer; }
