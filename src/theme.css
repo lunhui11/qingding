@@ -96,3 +96,11 @@
 .app-shell[data-theme="light"] .flow-window-grid span { color: #75838a; }
 .app-shell[data-theme="light"] .sector-list > div { border-color: #e1e8eb; }
 .app-shell[data-theme="light"] .sector-list > div > span small { color: #77858c; }
+.app-shell[data-theme="light"] .candlestick .cost-line { stroke: #334148; }
+.app-shell[data-theme="light"] .cost-legend { color: #46575f; }
+.app-shell[data-theme="light"] .position-card { border-color: #d7e0e4; background: #f6f8f9; }
+.app-shell[data-theme="light"] .position-card header,
+.app-shell[data-theme="light"] .position-form label { color: #66767e; }
+.app-shell[data-theme="light"] .position-form input { border-color: #d1dce0; background: #fff; color: #29373e; }
+.app-shell[data-theme="light"] .position-form button { background: #d8eee9; color: #176f61; }
+.app-shell[data-theme="light"] .position-note { color: #7a888f; }

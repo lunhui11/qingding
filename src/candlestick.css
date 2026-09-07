@@ -10,10 +10,23 @@
 .ma-toolbar .chart-toggle { margin-left: auto; opacity: 1; color: #71808a; border: 1px solid #2d3942; border-radius: 4px; padding: 2px 5px; }
 .candlestick .ma-line { fill: none; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 .candlestick .ma-line.ma5 { stroke: #d8a735; }.candlestick .ma-line.ma10 { stroke: #4aa3df; }.candlestick .ma-line.ma30 { stroke: #ad79d8; }
+.candlestick .cost-line { stroke: #f3f5f6; stroke-width: 1; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; opacity: .8; }
+.cost-legend { color: #cbd3d8; font-size: 8px; padding-left: 2px; white-space: nowrap; }
 .kline-widget.collapsed { padding-bottom: 2px; border-bottom: 1px solid #253039; }
 .flow-window-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 5px 0 9px; }
 .flow-window-grid div { background: #151e24; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
 .flow-window-grid span { font-size: 9px; color: #63717b; }.flow-window-grid b { font-size: 11px; font-variant-numeric: tabular-nums; }
+.position-card { margin: 8px 0; padding: 8px; border: 1px solid #2b373f; border-radius: 7px; background: #12191e; }
+.position-card header { display: flex; justify-content: space-between; align-items: center; color: #81909a; font-size: 10px; }
+.position-card header button { border: 0; background: none; color: #6e7d86; cursor: pointer; font-size: 9px; }
+.position-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 5px; margin-top: 7px; }
+.position-form label { color: #63717b; font-size: 8px; display: flex; flex-direction: column; gap: 3px; }
+.position-form input { width: 100%; min-width: 0; border: 1px solid #303c44; border-radius: 4px; background: #0e1418; color: #d5dde2; padding: 5px; font-size: 10px; }
+.position-form button { align-self: end; border: 0; border-radius: 4px; background: #21463f; color: #87dac9; padding: 6px 3px; cursor: pointer; font-size: 9px; }
+.position-profit { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 7px; }
+.position-profit div { display: flex; flex-direction: column; gap: 2px; }
+.position-profit span { font-size: 8px; color: #65737c; }.position-profit b { font-size: 12px; font-variant-numeric: tabular-nums; }
+.position-note { margin: 5px 0 0; color: #53616a; font-size: 8px; }
 .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 9px 0; }
 .metric-grid div { background: #11181d; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
 .metric-grid span { font-size: 9px; color: #63717b; }
@@ -21,3 +34,4 @@
 .signal-chips { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
 .signal-chip { border-radius: 3px; background: #27333a; color: #91a0aa; padding: 2px 5px; font-size: 8px; }
 .signal-chip.hot { background: #53392b; color: #ffc08b; }
+.settings-section { margin: 17px 0 -4px; padding-top: 10px; border-top: 1px solid #29333b; color: var(--teal); font-size: 10px; font-weight: 600; letter-spacing: .5px; }

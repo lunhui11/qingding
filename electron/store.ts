@@ -1,4 +1,6 @@
-import Store from 'electron-store'
+import { app } from 'electron'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { AppState } from './types'
 
 export const defaults: AppState = {
@@ -11,22 +13,38 @@ export const defaults: AppState = {
   todos: '今日待办\n\n□ 整理项目进度\n□ 跟进本周数据\n□ 准备会议材料',
   todoItems: [],
   todoLogs: [],
-  settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: 0.96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false }
+  settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: 0.96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05 }
 }
 
-const store = new Store<AppState>({ name: 'market-float-settings', defaults })
+let cached: AppState | undefined
+const statePath = () => join(app.getPath('userData'), 'market-float-settings.json')
+
+const loadFromDisk = (): AppState => {
+  if (cached) return cached
+  let saved: Partial<AppState> = {}
+  try { if (existsSync(statePath())) saved = JSON.parse(readFileSync(statePath(), 'utf8')) as Partial<AppState> } catch { saved = {} }
+  cached = {
+    ...defaults,
+    ...saved,
+    watchlist: saved.watchlist ?? defaults.watchlist,
+    alerts: saved.alerts ?? defaults.alerts,
+    todoItems: (saved.todoItems ?? defaults.todoItems).filter(item => !item.id.startsWith('welcome-')),
+    todoLogs: saved.todoLogs ?? defaults.todoLogs,
+    settings: { ...defaults.settings, ...saved.settings, refreshMs: saved.settings?.refreshMs === 3000 ? 1000 : saved.settings?.refreshMs ?? defaults.settings.refreshMs }
+  }
+  return cached
+}
+
+const writeToDisk = (state: AppState) => {
+  const file = statePath(); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, JSON.stringify(state, null, 2), 'utf8')
+}
+
 export function getState(): AppState {
-  const state = store.store
-  const todoItems = (state.todoItems ?? []).filter(item => !item.id.startsWith('welcome-'))
-  return { ...state, todoItems, settings: { ...defaults.settings, ...state.settings, refreshMs: state.settings.refreshMs === 3000 ? 1000 : state.settings.refreshMs } }
+  return loadFromDisk()
 }
 export function patchState(patch: Partial<AppState>): AppState {
-  if (patch.watchlist) store.set('watchlist', patch.watchlist)
-  if (patch.alerts) store.set('alerts', patch.alerts)
-  if (typeof patch.todos === 'string') store.set('todos', patch.todos)
-  if (patch.todoItems) store.set('todoItems', patch.todoItems)
-  if (patch.todoLogs) store.set('todoLogs', patch.todoLogs)
-  if (patch.settings) store.set('settings', { ...store.get('settings'), ...patch.settings })
-  if (patch.windowBounds) store.set('windowBounds', patch.windowBounds)
-  return getState()
+  const current = loadFromDisk()
+  cached = { ...current, ...patch, settings: patch.settings ? { ...current.settings, ...patch.settings } : current.settings }
+  writeToDisk(cached)
+  return cached
 }

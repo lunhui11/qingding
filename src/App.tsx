@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, LayoutGrid, Moon, Pause, Play, Plus, Search, Sun, Trash2, X } from 'lucide-react'
 import type { AppState, DetailData, HotRankItem, PriceAlert, Quote, SearchResult, SectorRankItem, SplitEstimate, TodoItem, TodoLog, WatchItem } from './types'
-import { alertTriggered, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid, smartSignal } from './utils'
+import { alertTriggered, calculatePositionProfit, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid, smartSignal } from './utils'
 import Sparkline from './components/Sparkline'
 import TitleBar from './components/TitleBar'
 import Decoy from './components/Decoy'
 import SettingsPanel from './components/SettingsPanel'
 import Candlestick from './components/Candlestick'
 
-const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false } }
+const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05 } }
 
 export default function App() {
   const [state, setState] = useState<AppState>(fallbackState)
@@ -65,7 +65,7 @@ export default function App() {
   }, [state.watchlist, state.settings.paused, checkAlerts])
 
   useEffect(() => {
-    refresh()
+    if (!decoy) refresh()
     const chooseDelay = () => decoy || document.hidden ? state.settings.idleRefreshMs : isTradingTime() ? state.settings.refreshMs : 60_000
     let timer = window.setTimeout(function tick() { refresh(); timer = window.setTimeout(tick, chooseDelay()) }, chooseDelay())
     return () => clearTimeout(timer)
@@ -117,7 +117,8 @@ export default function App() {
             {open ? <ChevronUp className="chevron" size={14}/> : <ChevronDown className="chevron" size={14}/>} 
           </button>
           {open && <div className="detail">
-            <div className="chart-block"><header><span>30 日 K 线</span><span>{detail?.klines.at(-1)?.date ?? '加载中'}</span></header><Candlestick points={detail?.klines ?? []}/></div>
+            <div className="chart-block"><header><span>30 日 K 线</span><span>{detail?.klines.at(-1)?.date ?? '加载中'}</span></header><Candlestick points={detail?.klines ?? []} costPrice={item.costPrice}/></div>
+            <PositionCard item={item} price={q?.price ?? null} settings={state.settings} onSave={position => save({ watchlist: state.watchlist.map(v => secid(v) === id ? { ...v, ...position } : v) })}/>
             <div className="metric-grid"><div><span>成交额</span><b>{fmtMoney(q?.amount ?? null).replace('+','')}</b></div><div><span>量比</span><b>{q?.volumeRatio == null ? '—' : q.volumeRatio.toFixed(2)}</b></div><div><span>实际换手率</span><b>{q?.actualTurnoverRate == null ? '—' : `${q.actualTurnoverRate.toFixed(2)}%`}</b></div></div>
             <div className="flow-window-grid"><div><span>今日均价</span><b>{fmtPrice(detail?.averagePrice.at(-1)?.value ?? null)}</b></div><div><span>近 5 分钟主力</span><b className={directionClass(detail?.flow5m ?? null, state.settings)}>{fmtMoney(detail?.flow5m ?? null)}</b></div><div><span>近 10 分钟主力</span><b className={directionClass(detail?.flow10m ?? null, state.settings)}>{fmtMoney(detail?.flow10m ?? null)}</b></div></div>
             <div className="chart-block"><header><span>{detail?.price.length ? '今日分时' : '收盘走势（分时暂缺）'}</span><span>{detail?.price.at(-1)?.time?.slice(-5) ?? detail?.klines.at(-1)?.date ?? '加载中'}</span></header><Sparkline points={detail?.price.length ? detail.price : detail?.klines.map(v => ({ time: v.date, value: v.close })) ?? []} positive={(change ?? 0) >= 0}/></div>
@@ -137,6 +138,36 @@ export default function App() {
     {sectorOpen && <SectorRankPanel items={sectorRanks} settings={state.settings} onClose={() => setSectorOpen(false)}/>} 
     {alertFor && <AlertEditor stock={state.watchlist.find(v => secid(v) === alertFor)!} alerts={state.alerts.filter(a => a.secid === alertFor)} onSave={alerts => save({ alerts: [...state.alerts.filter(a => a.secid !== alertFor), ...alerts] })} onClose={() => setAlertFor(undefined)}/>} 
   </div>
+}
+
+function PositionCard({ item, price, settings, onSave }: { item: WatchItem; price: number | null; settings: AppState['settings']; onSave(value: Pick<WatchItem, 'costPrice' | 'holdingLots' | 'lotSize'>): void }) {
+  const defaultLotSize = item.market === 'HK' ? 100 : 100
+  const [cost, setCost] = useState(item.costPrice?.toString() ?? '')
+  const [lots, setLots] = useState(item.holdingLots?.toString() ?? '')
+  const [lotSize, setLotSize] = useState((item.lotSize ?? defaultLotSize).toString())
+  useEffect(() => { setCost(item.costPrice?.toString() ?? ''); setLots(item.holdingLots?.toString() ?? ''); setLotSize((item.lotSize ?? defaultLotSize).toString()) }, [item.costPrice, item.holdingLots, item.lotSize, defaultLotSize])
+  const profit = calculatePositionProfit(price, item.costPrice, item.holdingLots, item.lotSize ?? defaultLotSize, settings)
+  const exactMoney = (value: number) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(value))}`
+  const persist = () => {
+    const costPrice = Number(cost); const holdingLots = Number(lots); const size = Number(lotSize)
+    if (!Number.isFinite(costPrice) || costPrice <= 0 || !Number.isFinite(holdingLots) || holdingLots < 0 || !Number.isFinite(size) || size <= 0) return
+    onSave({ costPrice, holdingLots, lotSize: item.market === 'HK' ? size : 100 })
+  }
+  const clear = () => { setCost(''); setLots(''); setLotSize(defaultLotSize.toString()); onSave({ costPrice: undefined, holdingLots: undefined, lotSize: undefined }) }
+  return <section className="position-card">
+    <header><span>我的持仓 · 仅保存在本机</span>{item.costPrice != null && <button onClick={clear}>清除</button>}</header>
+    <div className="position-form">
+      <label>成本价<input type="number" min="0" step="0.001" value={cost} onChange={e => setCost(e.target.value)} placeholder="例如 32.50"/></label>
+      <label>持仓手数<input type="number" min="0" step="1" value={lots} onChange={e => setLots(e.target.value)} placeholder="例如 10"/></label>
+      {item.market === 'HK' && <label>每手股数<input type="number" min="1" step="1" value={lotSize} onChange={e => setLotSize(e.target.value)} placeholder="100"/></label>}
+      <button onClick={persist}>保存持仓</button>
+    </div>
+    {profit && <><div className="position-profit">
+      <div><span>净浮动盈亏</span><b className={directionClass(profit.amount, settings)}>{exactMoney(profit.amount)} 元</b></div>
+      <div><span>距成本线</span><b className={directionClass(profit.pointChange, settings)}>{profit.pointChange > 0 ? '+' : ''}{fmtPrice(profit.pointChange)} 点</b></div>
+      <div><span>收益率</span><b className={directionClass(profit.percent, settings)}>{profit.percent > 0 ? '+' : ''}{profit.percent.toFixed(2)}%</b></div>
+    </div><p className="position-note">{item.holdingLots} 手 · {profit.shares.toLocaleString('zh-CN')} 股 · 预估费用 {exactMoney(profit.fees).replace('+', '')} 元（按一次买入、当前一次卖出）</p></>}
+  </section>
 }
 
 function SectorRankPanel({ items, settings, onClose }: { items: SectorRankItem[]; settings: AppState['settings']; onClose(): void }) {

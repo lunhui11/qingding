@@ -10,3 +10,4 @@ Thumbs.db
 !.env.example
 coverage/
 .pack-cache/
+.electron-dist/

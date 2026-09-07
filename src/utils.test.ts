@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alertTriggered, fmtMoney, isTradingTime, secid, smartSignal } from './utils'
+import { alertTriggered, calculatePositionProfit, fmtMoney, isTradingTime, secid, smartSignal } from './utils'
 import type { PriceAlert, Quote } from './types'
 
 const quote: Quote = { market: 'SH', code: '600519', name: '测试', price: 1500, previousClose: 1490, change: 10, changePercent: .67, mainNetInflow: null, mainNetRatio: null, superLargeNet: null, largeNet: null, amount: 1e9, volumeRatio: 1.5, actualTurnoverRate: 2.1, updatedAt: '', status: 'live' }
@@ -26,5 +26,18 @@ describe('trading sessions', () => {
     expect(isTradingTime(new Date('2026-09-07T10:00:00'))).toBe(true)
     expect(isTradingTime(new Date('2026-09-07T12:30:00'))).toBe(false)
     expect(isTradingTime(new Date('2026-09-06T10:00:00'))).toBe(false)
+  })
+})
+describe('position profit', () => {
+  it('calculates points, percentage and amount by lots', () => {
+    expect(calculatePositionProfit(12, 10, 5, 100)).toEqual({ pointChange: 2, percent: 20, amount: 1000, grossAmount: 1000, fees: 0, shares: 500 })
+    expect(calculatePositionProfit(9, 10, 2, 100)?.amount).toBe(-200)
+    expect(calculatePositionProfit(null, 10, 2, 100)).toBeNull()
+  })
+  it('deducts both commissions and sell-side stamp duty', () => {
+    const result = calculatePositionProfit(12, 10, 5, 100, { commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05 })!
+    expect(result.grossAmount).toBe(1000)
+    expect(result.fees).toBe(13)
+    expect(result.amount).toBe(987)
   })
 })

@@ -34,3 +34,16 @@ export const smartSignal = (quote?: Quote, split?: SplitEstimate): SmartSignal =
   return null
 }
 export const displayMarket = (market: Market) => market === 'HK' ? '港' : market === 'SH' ? '沪' : '深'
+
+export interface TradingFees { commissionRate: number; minimumCommission: number; stampDutyRate: number }
+export interface PositionProfit { pointChange: number; percent: number; amount: number; grossAmount: number; fees: number; shares: number }
+export const calculatePositionProfit = (price: number | null, costPrice?: number, holdingLots?: number, lotSize = 100, fees?: TradingFees): PositionProfit | null => {
+  if (price == null || !Number.isFinite(price) || !costPrice || costPrice <= 0 || holdingLots == null || holdingLots < 0 || !Number.isFinite(lotSize) || lotSize <= 0) return null
+  const pointChange = price - costPrice; const shares = holdingLots * lotSize
+  const buyValue = costPrice * shares; const sellValue = price * shares
+  const rate = Math.max(0, fees?.commissionRate ?? 0) / 10_000; const minimum = Math.max(0, fees?.minimumCommission ?? 0)
+  const buyCommission = shares ? Math.max(buyValue * rate, minimum) : 0; const sellCommission = shares ? Math.max(sellValue * rate, minimum) : 0
+  const stampDuty = sellValue * Math.max(0, fees?.stampDutyRate ?? 0) / 100
+  const grossAmount = pointChange * shares; const totalFees = buyCommission + sellCommission + stampDuty; const amount = grossAmount - totalFees
+  return { pointChange, percent: buyValue + buyCommission ? amount / (buyValue + buyCommission) * 100 : 0, amount, grossAmount, fees: totalFees, shares }
+}
