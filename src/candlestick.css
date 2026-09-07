@@ -2,6 +2,18 @@
 .candlestick line { stroke-width: 1; vector-effect: non-scaling-stroke; }
 .candlestick .candle-up line, .candlestick .candle-up rect { stroke: var(--rise); fill: var(--rise); }
 .candlestick .candle-down line, .candlestick .candle-down rect { stroke: var(--fall); fill: var(--fall); }
+.ma-toolbar { display: flex; align-items: center; gap: 4px; margin: 4px 0 5px; }
+.ma-toolbar button { border: 0; background: none; padding: 2px 3px; font-size: 8px; color: #56636d; cursor: pointer; opacity: .5; }
+.ma-toolbar button.active { opacity: 1; }
+.ma-toolbar button b { font-size: 9px; font-weight: 600; }
+.ma-toolbar .ma5 { color: #d8a735; }.ma-toolbar .ma10 { color: #4aa3df; }.ma-toolbar .ma30 { color: #ad79d8; }
+.ma-toolbar .chart-toggle { margin-left: auto; opacity: 1; color: #71808a; border: 1px solid #2d3942; border-radius: 4px; padding: 2px 5px; }
+.candlestick .ma-line { fill: none; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+.candlestick .ma-line.ma5 { stroke: #d8a735; }.candlestick .ma-line.ma10 { stroke: #4aa3df; }.candlestick .ma-line.ma30 { stroke: #ad79d8; }
+.kline-widget.collapsed { padding-bottom: 2px; border-bottom: 1px solid #253039; }
+.flow-window-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 5px 0 9px; }
+.flow-window-grid div { background: #151e24; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.flow-window-grid span { font-size: 9px; color: #63717b; }.flow-window-grid b { font-size: 11px; font-variant-numeric: tabular-nums; }
 .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 9px 0; }
 .metric-grid div { background: #11181d; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
 .metric-grid span { font-size: 9px; color: #63717b; }

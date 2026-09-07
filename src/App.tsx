@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, Moon, Pause, Play, Plus, Search, Sun, Trash2, X } from 'lucide-react'
-import type { AppState, DetailData, HotRankItem, PriceAlert, Quote, SearchResult, SplitEstimate, TodoItem, TodoLog, WatchItem } from './types'
+import { Activity, Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, LayoutGrid, Moon, Pause, Play, Plus, Search, Sun, Trash2, X } from 'lucide-react'
+import type { AppState, DetailData, HotRankItem, PriceAlert, Quote, SearchResult, SectorRankItem, SplitEstimate, TodoItem, TodoLog, WatchItem } from './types'
 import { alertTriggered, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid, smartSignal } from './utils'
 import Sparkline from './components/Sparkline'
 import TitleBar from './components/TitleBar'
@@ -21,6 +21,8 @@ export default function App() {
   const [alertFor, setAlertFor] = useState<string>()
   const [hotOpen, setHotOpen] = useState(false)
   const [hotRanks, setHotRanks] = useState<HotRankItem[]>([])
+  const [sectorOpen, setSectorOpen] = useState(false)
+  const [sectorRanks, setSectorRanks] = useState<SectorRankItem[]>([])
   const [splits, setSplits] = useState<Record<string, SplitEstimate>>({})
   const [lastUpdated, setLastUpdated] = useState<Date>()
   const [networkError, setNetworkError] = useState(false)
@@ -72,7 +74,7 @@ export default function App() {
   useEffect(() => {
     if (!expanded || decoy) return
     const item = state.watchlist.find(v => secid(v) === expanded); if (!item) return
-    const load = async () => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => { const previous = old[expanded]; return { ...old, [expanded]: { ...loaded, price: loaded.price.length ? loaded.price : previous?.price ?? [], klines: loaded.klines.length ? loaded.klines : previous?.klines ?? [], capital: loaded.capital.length ? loaded.capital : previous?.capital ?? [] } } }); setSplits(old => ({ ...old, [expanded]: loaded.splitEstimate })) } finally { detailBusy.current = false } }
+    const load = async () => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => { const previous = old[expanded]; return { ...old, [expanded]: { ...loaded, price: loaded.price.length ? loaded.price : previous?.price ?? [], averagePrice: loaded.averagePrice.length ? loaded.averagePrice : previous?.averagePrice ?? [], minuteCapital: loaded.minuteCapital.length ? loaded.minuteCapital : previous?.minuteCapital ?? [], flow5m: loaded.flow5m ?? previous?.flow5m ?? null, flow10m: loaded.flow10m ?? previous?.flow10m ?? null, klines: loaded.klines.length ? loaded.klines : previous?.klines ?? [], capital: loaded.capital.length ? loaded.capital : previous?.capital ?? [] } } }); setSplits(old => ({ ...old, [expanded]: loaded.splitEstimate })) } finally { detailBusy.current = false } }
     load(); const timer = window.setInterval(load, Math.max(1000, state.settings.refreshMs)); return () => clearInterval(timer)
   }, [expanded, decoy, state.watchlist, state.settings.refreshMs])
 
@@ -83,6 +85,7 @@ export default function App() {
   }, [decoy, state.settings.paused, state.settings.notifications, state.settings.smartAlerts, state.watchlist])
 
   useEffect(() => { if (hotOpen) window.marketFloat.fetchHotRank().then(setHotRanks).catch(() => setHotRanks([])) }, [hotOpen])
+  useEffect(() => { if (sectorOpen) window.marketFloat.fetchSectorRank().then(setSectorRanks).catch(() => setSectorRanks([])) }, [sectorOpen])
 
   const toggleDetail = (item: WatchItem) => {
     const id = secid(item); if (expanded === id) return setExpanded(undefined)
@@ -100,7 +103,7 @@ export default function App() {
     <TitleBar locked={state.settings.locked} status={status} onLock={() => updateSettings({ ...state.settings, locked: !state.settings.locked })} onSettings={() => setSettingsOpen(true)} onHide={() => window.marketFloat.hideWindow()}/>
     <div className="toolbar">
       <div><span className="eyebrow">WATCHLIST</span><h1>自选行情</h1></div>
-      <div className="tool-actions"><button title={state.settings.theme === 'dark' ? '切换亮色' : '切换暗色'} onClick={() => updateSettings({ ...state.settings, theme: state.settings.theme === 'dark' ? 'light' : 'dark' })}>{state.settings.theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}</button><button title="热度榜 TOP 10" onClick={() => setHotOpen(true)}><Flame size={16}/></button><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
+      <div className="tool-actions"><button title={state.settings.theme === 'dark' ? '切换亮色' : '切换暗色'} onClick={() => updateSettings({ ...state.settings, theme: state.settings.theme === 'dark' ? 'light' : 'dark' })}>{state.settings.theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}</button><button title="热门板块 TOP 10" onClick={() => setSectorOpen(true)}><LayoutGrid size={16}/></button><button title="热度榜 TOP 10" onClick={() => setHotOpen(true)}><Flame size={16}/></button><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
     </div>
     {!!state.watchlist.filter(v => !v.hidden).length && <div className="scan-summary"><span><Activity size={12}/>智能扫描</span><b className="rise">流入共振 {signalSummary.inflow}</b><b className="fall">流出共振 {signalSummary.outflow}</b></div>}
     <div className="column-head"><span>标的 / 资金动向</span><span>最新 / 涨跌</span></div>
@@ -116,6 +119,7 @@ export default function App() {
           {open && <div className="detail">
             <div className="chart-block"><header><span>30 日 K 线</span><span>{detail?.klines.at(-1)?.date ?? '加载中'}</span></header><Candlestick points={detail?.klines ?? []}/></div>
             <div className="metric-grid"><div><span>成交额</span><b>{fmtMoney(q?.amount ?? null).replace('+','')}</b></div><div><span>量比</span><b>{q?.volumeRatio == null ? '—' : q.volumeRatio.toFixed(2)}</b></div><div><span>实际换手率</span><b>{q?.actualTurnoverRate == null ? '—' : `${q.actualTurnoverRate.toFixed(2)}%`}</b></div></div>
+            <div className="flow-window-grid"><div><span>今日均价</span><b>{fmtPrice(detail?.averagePrice.at(-1)?.value ?? null)}</b></div><div><span>近 5 分钟主力</span><b className={directionClass(detail?.flow5m ?? null, state.settings)}>{fmtMoney(detail?.flow5m ?? null)}</b></div><div><span>近 10 分钟主力</span><b className={directionClass(detail?.flow10m ?? null, state.settings)}>{fmtMoney(detail?.flow10m ?? null)}</b></div></div>
             <div className="chart-block"><header><span>{detail?.price.length ? '今日分时' : '收盘走势（分时暂缺）'}</span><span>{detail?.price.at(-1)?.time?.slice(-5) ?? detail?.klines.at(-1)?.date ?? '加载中'}</span></header><Sparkline points={detail?.price.length ? detail.price : detail?.klines.map(v => ({ time: v.date, value: v.close })) ?? []} positive={(change ?? 0) >= 0}/></div>
             <div className="chart-block"><header><span>近 20 日主力资金</span><span>{item.market === 'HK' ? '趋势暂无数据' : fmtMoney(q?.mainNetInflow ?? null)}</span></header><Sparkline points={detail?.capital ?? []} positive={(q?.mainNetInflow ?? 0) >= 0}/></div>
             <div className="breakdown"><span>超大单 <b className={directionClass(q?.superLargeNet ?? null, state.settings)}>{fmtMoney(q?.superLargeNet ?? null)}</b></span><span>大单 <b className={directionClass(q?.largeNet ?? null, state.settings)}>{fmtMoney(q?.largeNet ?? null)}</b></span></div>
@@ -130,8 +134,13 @@ export default function App() {
     {settingsOpen && <SettingsPanel value={state.settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} shortcutError={shortcutError}/>} 
     {addOpen && <AddStock state={state} onSave={save} onClose={() => setAddOpen(false)}/>} 
     {hotOpen && <HotRankPanel items={hotRanks} state={state} onSave={save} onClose={() => setHotOpen(false)}/>} 
+    {sectorOpen && <SectorRankPanel items={sectorRanks} settings={state.settings} onClose={() => setSectorOpen(false)}/>} 
     {alertFor && <AlertEditor stock={state.watchlist.find(v => secid(v) === alertFor)!} alerts={state.alerts.filter(a => a.secid === alertFor)} onSave={alerts => save({ alerts: [...state.alerts.filter(a => a.secid !== alertFor), ...alerts] })} onClose={() => setAlertFor(undefined)}/>} 
   </div>
+}
+
+function SectorRankPanel({ items, settings, onClose }: { items: SectorRankItem[]; settings: AppState['settings']; onClose(): void }) {
+  return <div className="overlay"><section className="panel hot-panel"><div className="panel-head"><div><small>按主力净流入排序</small><h2>热门板块 TOP 10</h2></div><button onClick={onClose}><X size={18}/></button></div><div className="sector-list">{items.length ? items.map((item, index) => <div key={`${item.kind}-${item.code}`}><strong>{index + 1}</strong><span><b>{item.name}</b><small>{item.kind === 'industry' ? '行业' : '概念'} · {item.code}</small></span><em className={directionClass(item.changePercent, settings)}>{item.changePercent == null ? '—' : `${item.changePercent > 0 ? '+' : ''}${item.changePercent.toFixed(2)}%`}</em><i className={directionClass(item.mainNetInflow, settings)}>{fmtMoney(item.mainNetInflow)}<small>{item.mainNetRatio == null ? '' : `${item.mainNetRatio.toFixed(2)}%`}</small></i></div>) : <p>板块数据加载中或暂时不可用</p>}</div><p className="fineprint">合并行业与概念板块，按公开行情源主力净流入排序，仅反映当日资金热度。</p></section></div>
 }
 
 function AddStock({ state, onSave, onClose }: { state: AppState; onSave(p: Partial<AppState>): void; onClose(): void }) {

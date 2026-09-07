@@ -1,4 +1,4 @@
-import type { DetailData, HotRankItem, Market, Quote, SearchResult, SplitEstimate, SplitSignal, TradePrint, WatchItem } from './types'
+import type { DetailData, HotRankItem, Market, Quote, SearchResult, SectorRankItem, SplitEstimate, SplitSignal, TradePrint, TrendPoint, WatchItem } from './types'
 
 const fields = 'f12,f13,f14,f2,f3,f4,f5,f6,f8,f10,f18,f21,f62,f184,f66,f72'
 const headers = { Referer: 'https://quote.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 MarketFloat/1.0' }
@@ -36,24 +36,36 @@ export async function fetchQuotes(items: WatchItem[]): Promise<Quote[]> {
 
 export async function fetchDetail(item: WatchItem): Promise<DetailData> {
   const secid = toSecid(item)
-  const priceUrl = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11&fields2=f51,f53&ndays=1&iscr=0`
+  const priceUrl = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11&fields2=f51,f52,f53&ndays=1&iscr=0`
   const fundUrl = `https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55&lmt=20&klt=101`
+  const minuteFundUrl = `https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55&lmt=20&klt=1`
   const klineUrl = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&lmt=30&end=20500101`
   const tradesUrl = `https://push2.eastmoney.com/api/qt/stock/details/get?secid=${secid}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&pos=-160`
-  const [priceResult, fundResult, klineResult, tradesResult] = await Promise.allSettled([getJson(priceUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(fundUrl), getJson(klineUrl), getJson(tradesUrl)])
+  const [priceResult, fundResult, minuteFundResult, klineResult, tradesResult] = await Promise.allSettled([getJson(priceUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(fundUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(minuteFundUrl), getJson(klineUrl), getJson(tradesUrl)])
   const trends: string[] = priceResult.status === 'fulfilled' ? priceResult.value?.data?.trends ?? [] : []
   const klines: string[] = fundResult.status === 'fulfilled' ? fundResult.value?.data?.klines ?? [] : []
+  const minuteKlines: string[] = minuteFundResult.status === 'fulfilled' ? minuteFundResult.value?.data?.klines ?? [] : []
   const tradeRows: string[] = tradesResult.status === 'fulfilled' ? tradesResult.value?.data?.details ?? [] : []
   const klineRows: string[] = klineResult.status === 'fulfilled' ? klineResult.value?.data?.klines ?? [] : []
   const trades = tradeRows.map(v => { const [time, price, volume, , side] = v.split(','); return { time, price: Number(price), volume: Number(volume), side: Number(side) as TradePrint['side'] } }).filter(v => Number.isFinite(v.price) && Number.isFinite(v.volume))
+  const minuteCapital = minuteKlines.map(v => { const [time, value] = v.split(','); return { time, value: Number(value) } }).filter(v => Number.isFinite(v.value))
   return {
     price: trends.map(v => { const [time, price] = v.split(','); return { time, value: Number(price) } }).filter(v => Number.isFinite(v.value)),
+    averagePrice: trends.map(v => { const [time, , average] = v.split(','); return { time, value: Number(average) } }).filter(v => Number.isFinite(v.value)),
     capital: klines.map(v => { const [time, value] = v.split(','); return { time, value: Number(value) } }).filter(v => Number.isFinite(v.value)),
+    minuteCapital,
+    flow5m: recentNetFlow(minuteCapital, 5),
+    flow10m: recentNetFlow(minuteCapital, 10),
     klines: klineRows.map(v => { const [date, open, close, high, low, volume, amount] = v.split(','); return { date, open: Number(open), close: Number(close), high: Number(high), low: Number(low), volume: Number(volume), amount: Number(amount) } }).filter(v => Number.isFinite(v.close)),
     splitSignals: detectSplitSignals(trades, item.market),
     splitEstimate: estimateSplitFlow(trades, item.market),
     updatedAt: new Date().toISOString()
   }
+}
+
+export function recentNetFlow(points: TrendPoint[], minutes: number): number | null {
+  if (points.length <= minutes) return null
+  return points.at(-1)!.value - points[points.length - 1 - minutes].value
 }
 
 export async function fetchSplitEstimate(item: WatchItem): Promise<SplitEstimate> {
@@ -95,6 +107,16 @@ export async function fetchHotRank(): Promise<HotRankItem[]> {
   const items: WatchItem[] = ranks.map(v => ({ market: String(v.sc).startsWith('SH') ? 'SH' : 'SZ', code: String(v.sc).slice(2), name: String(v.sc) }))
   const quotes = await fetchQuotes(items)
   return quotes.map((quote, i) => ({ ...quote, rank: Number(ranks[i]?.rk ?? i + 1), rankChange: Number(ranks[i]?.hisRc ?? 0) }))
+}
+
+export async function fetchSectorRank(): Promise<SectorRankItem[]> {
+  const load = async (kind: SectorRankItem['kind'], filter: string) => {
+    const url = `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=10&po=1&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent(filter)}&fields=f12,f14,f3,f62,f184`
+    const json = await getJson(url); const rows: any[] = json?.data?.diff ?? []
+    return rows.map(row => ({ code: String(row.f12 ?? ''), name: String(row.f14 ?? ''), kind, changePercent: scaled(row.f3, 1), mainNetInflow: scaled(row.f62, 1), mainNetRatio: scaled(row.f184, 1) }))
+  }
+  const results = await Promise.allSettled([load('industry', 'm:90+t:2'), load('concept', 'm:90+t:3')])
+  return results.flatMap(result => result.status === 'fulfilled' ? result.value : []).filter(item => item.name && item.mainNetInflow != null).sort((a, b) => (b.mainNetInflow ?? 0) - (a.mainNetInflow ?? 0)).slice(0, 10)
 }
 
 export function parseDirectCode(query: string): SearchResult[] {

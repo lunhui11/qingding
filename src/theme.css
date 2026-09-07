@@ -90,3 +90,9 @@
 .app-shell[data-theme="light"] .hot-list > div > button { border-color: #d1dde1; background: #f3f6f7; color: #197765; }
 .app-shell[data-theme="light"] .split-summary { color: #68777e; }
 .app-shell[data-theme="light"] .split-summary span { background: #edf2f4; }
+.app-shell[data-theme="light"] .ma-toolbar .chart-toggle { border-color: #d2dde1; color: #64747b; }
+.app-shell[data-theme="light"] .kline-widget.collapsed { border-color: #dce4e7; }
+.app-shell[data-theme="light"] .flow-window-grid div { background: #f2f5f6; }
+.app-shell[data-theme="light"] .flow-window-grid span { color: #75838a; }
+.app-shell[data-theme="light"] .sector-list > div { border-color: #e1e8eb; }
+.app-shell[data-theme="light"] .sector-list > div > span small { color: #77858c; }

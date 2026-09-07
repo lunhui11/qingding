@@ -9,4 +9,12 @@
 .hot-list > p { text-align: center; color: #68757e; font-size: 11px; padding: 35px 0; }
 .split-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px; font-size: 9px; color: #66737d; }
 .split-summary span { display: flex; justify-content: space-between; background: #182127; border-radius: 4px; padding: 4px; }
+.sector-list > div { display: grid; grid-template-columns: 25px 1fr 48px 72px; align-items: center; gap: 6px; min-height: 45px; border-bottom: 1px solid #273139; }
+.sector-list > div > strong { color: #f0ae70; text-align: center; }
+.sector-list > div > span { display: flex; flex-direction: column; font-size: 11px; }
+.sector-list > div > span small { color: #65727c; font-size: 8px; margin-top: 2px; }
+.sector-list > div > em { font-style: normal; font-size: 10px; text-align: right; }
+.sector-list > div > i { font-style: normal; font-size: 10px; text-align: right; display: flex; flex-direction: column; }
+.sector-list > div > i small { font-size: 8px; opacity: .72; }
+.sector-list > p { text-align: center; color: #68757e; font-size: 11px; padding: 35px 0; }
 .signal-chips i { font-style: normal; }

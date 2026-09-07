@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectSplitSignals, marketFromId, parseDirectCode, toSecid } from './market'
+import { detectSplitSignals, marketFromId, parseDirectCode, recentNetFlow, toSecid } from './market'
 
 describe('market identifiers', () => {
   it('maps API secids', () => {
@@ -25,5 +25,14 @@ describe('split-order radar', () => {
   it('ignores sparse or mixed prints', () => {
     const trades = Array.from({ length: 5 }, (_, i) => ({ time: `10:00:${String(i * 10).padStart(2, '0')}`, price: 10, volume: 10, side: (i % 2 ? 1 : 2) as 1 | 2 }))
     expect(detectSplitSignals(trades, 'SH')).toEqual([])
+  })
+})
+
+describe('minute capital windows', () => {
+  const points = Array.from({ length: 12 }, (_, i) => ({ time: `10:${String(i).padStart(2, '0')}`, value: i * 1_000_000 }))
+  it('calculates change from cumulative capital flow', () => {
+    expect(recentNetFlow(points, 5)).toBe(5_000_000)
+    expect(recentNetFlow(points, 10)).toBe(10_000_000)
+    expect(recentNetFlow(points.slice(0, 5), 5)).toBeNull()
   })
 })
