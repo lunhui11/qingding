@@ -1,0 +1,11 @@
+.candlestick { width: 100%; height: 86px; display: block; border-bottom: 1px solid #253039; }
+.candlestick line { stroke-width: 1; vector-effect: non-scaling-stroke; }
+.candlestick .candle-up line, .candlestick .candle-up rect { stroke: var(--rise); fill: var(--rise); }
+.candlestick .candle-down line, .candlestick .candle-down rect { stroke: var(--fall); fill: var(--fall); }
+.metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 9px 0; }
+.metric-grid div { background: #11181d; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.metric-grid span { font-size: 9px; color: #63717b; }
+.metric-grid b { font-size: 11px; color: #c5cdd2; font-variant-numeric: tabular-nums; }
+.signal-chips { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.signal-chip { border-radius: 3px; background: #27333a; color: #91a0aa; padding: 2px 5px; font-size: 8px; }
+.signal-chip.hot { background: #53392b; color: #ffc08b; }

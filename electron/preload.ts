@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('marketFloat', {
   saveState: (patch: Partial<AppState>) => ipcRenderer.invoke('state:save', patch),
   fetchQuotes: (items: WatchItem[]) => ipcRenderer.invoke('market:quotes', items),
   fetchDetail: (item: WatchItem) => ipcRenderer.invoke('market:detail', item),
+  fetchSplitEstimate: (item: WatchItem) => ipcRenderer.invoke('market:split', item),
+  fetchHotRank: () => ipcRenderer.invoke('market:hot-rank'),
   searchStocks: (query: string) => ipcRenderer.invoke('market:search', query),
   toggleDecoy: () => ipcRenderer.invoke('window:toggle-decoy'),
   setDecoy: (value: boolean) => ipcRenderer.invoke('window:set-decoy', value),

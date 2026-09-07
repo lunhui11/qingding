@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { alertTriggered, fmtMoney, isTradingTime, secid } from './utils'
 import type { PriceAlert, Quote } from './types'
 
-const quote: Quote = { market: 'SH', code: '600519', name: '测试', price: 1500, previousClose: 1490, change: 10, changePercent: .67, mainNetInflow: null, mainNetRatio: null, superLargeNet: null, largeNet: null, updatedAt: '', status: 'live' }
+const quote: Quote = { market: 'SH', code: '600519', name: '测试', price: 1500, previousClose: 1490, change: 10, changePercent: .67, mainNetInflow: null, mainNetRatio: null, superLargeNet: null, largeNet: null, amount: 1e9, volumeRatio: 1.5, actualTurnoverRate: 2.1, updatedAt: '', status: 'live' }
 const alert = (metric: PriceAlert['metric'], threshold: number): PriceAlert => ({ id: 'a', secid: 'SH.600519', metric, threshold, enabled: true })
 
 describe('format and identifiers', () => {

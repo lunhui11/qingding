@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, ChevronDown, ChevronUp, Eye, EyeOff, Pause, Play, Plus, Search, Trash2, X } from 'lucide-react'
-import type { AppState, DetailData, PriceAlert, Quote, SearchResult, TodoItem, TodoLog, WatchItem } from './types'
+import { Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, Pause, Play, Plus, Search, Trash2, X } from 'lucide-react'
+import type { AppState, DetailData, HotRankItem, PriceAlert, Quote, SearchResult, SplitEstimate, TodoItem, TodoLog, WatchItem } from './types'
 import { alertTriggered, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid } from './utils'
 import Sparkline from './components/Sparkline'
 import TitleBar from './components/TitleBar'
 import Decoy from './components/Decoy'
 import SettingsPanel from './components/SettingsPanel'
+import Candlestick from './components/Candlestick'
 
 const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, launchAtLogin: false, locked: false, paused: false } }
 
@@ -18,11 +19,16 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [alertFor, setAlertFor] = useState<string>()
+  const [hotOpen, setHotOpen] = useState(false)
+  const [hotRanks, setHotRanks] = useState<HotRankItem[]>([])
+  const [splits, setSplits] = useState<Record<string, SplitEstimate>>({})
   const [lastUpdated, setLastUpdated] = useState<Date>()
   const [networkError, setNetworkError] = useState(false)
   const [shortcutError, setShortcutError] = useState<string>()
   const busy = useRef(false)
   const detailBusy = useRef(false)
+  const splitBusy = useRef(false)
+  const splitCursor = useRef(0)
   const previousTriggers = useRef<Record<string, boolean>>({})
 
   useEffect(() => { window.marketFloat.loadState().then(setState); return window.marketFloat.onDecoyChanged(value => { setDecoy(value); window.marketFloat.loadState().then(setState) }) }, [])
@@ -63,9 +69,17 @@ export default function App() {
   useEffect(() => {
     if (!expanded || decoy) return
     const item = state.watchlist.find(v => secid(v) === expanded); if (!item) return
-    const load = async () => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => ({ ...old, [expanded]: loaded })) } finally { detailBusy.current = false } }
+    const load = async () => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => { const previous = old[expanded]; return { ...old, [expanded]: { ...loaded, price: loaded.price.length ? loaded.price : previous?.price ?? [], klines: loaded.klines.length ? loaded.klines : previous?.klines ?? [], capital: loaded.capital.length ? loaded.capital : previous?.capital ?? [] } } }); setSplits(old => ({ ...old, [expanded]: loaded.splitEstimate })) } finally { detailBusy.current = false } }
     load(); const timer = window.setInterval(load, Math.max(1000, state.settings.refreshMs)); return () => clearInterval(timer)
   }, [expanded, decoy, state.watchlist, state.settings.refreshMs])
+
+  useEffect(() => {
+    if (decoy || state.settings.paused) return
+    const loadNext = async () => { const visible = state.watchlist.filter(v => !v.hidden).slice(0, 12); if (!visible.length || splitBusy.current) return; const item = visible[splitCursor.current++ % visible.length]; splitBusy.current = true; try { const estimate = await window.marketFloat.fetchSplitEstimate(item); setSplits(old => ({ ...old, [secid(item)]: estimate })) } catch { /* retain the last valid estimate */ } finally { splitBusy.current = false } }
+    loadNext(); const timer = window.setInterval(loadNext, 1000); return () => clearInterval(timer)
+  }, [decoy, state.settings.paused, state.watchlist])
+
+  useEffect(() => { if (hotOpen) window.marketFloat.fetchHotRank().then(setHotRanks).catch(() => setHotRanks([])) }, [hotOpen])
 
   const toggleDetail = (item: WatchItem) => {
     const id = secid(item); if (expanded === id) return setExpanded(undefined)
@@ -82,23 +96,25 @@ export default function App() {
     <TitleBar locked={state.settings.locked} status={status} onLock={() => updateSettings({ ...state.settings, locked: !state.settings.locked })} onSettings={() => setSettingsOpen(true)} onHide={() => window.marketFloat.hideWindow()}/>
     <div className="toolbar">
       <div><span className="eyebrow">WATCHLIST</span><h1>自选行情</h1></div>
-      <div className="tool-actions"><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
+      <div className="tool-actions"><button title="热度榜 TOP 10" onClick={() => setHotOpen(true)}><Flame size={16}/></button><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
     </div>
     <div className="column-head"><span>标的 / 资金动向</span><span>最新 / 涨跌</span></div>
     <section className="watchlist">
       {state.watchlist.filter(v => !v.hidden).map(item => {
-        const id = secid(item); const q = quotes[id]; const change = q?.changePercent ?? null; const open = expanded === id; const detail = details[id]
+        const id = secid(item); const q = quotes[id]; const split = splits[id]; const change = q?.changePercent ?? null; const open = expanded === id; const detail = details[id]
         return <article className={`stock-card ${open ? 'expanded' : ''}`} key={id}>
           <button className="stock-main" onClick={() => toggleDetail(item)}>
-            <div className="identity"><div><span className="market-badge">{displayMarket(item.market)}</span><b>{q?.name || item.name}</b></div><small>{item.code}</small><div className={`capital ${directionClass(q?.mainNetInflow ?? null, state.settings)}`}><span>主力</span>{fmtMoney(q?.mainNetInflow ?? null)}{q?.mainNetRatio != null && <em>{q.mainNetRatio > 0 ? '+' : ''}{q.mainNetRatio.toFixed(2)}%</em>}</div></div>
+            <div className="identity"><div><span className="market-badge">{displayMarket(item.market)}</span><b>{q?.name || item.name}</b></div><small>{item.code}</small><div className={`capital ${directionClass(q?.mainNetInflow ?? null, state.settings)}`}><span>明盘</span>{fmtMoney(q?.mainNetInflow ?? null)}<em className={directionClass(split?.netAmount ?? null, state.settings)}>暗盘 {split ? fmtMoney(split.netAmount) : '扫描中'}</em></div><div className="signal-chips">{(q?.volumeRatio ?? 0) >= 2 && <i className="signal-chip hot">量比放大</i>}{split && Math.abs(split.netAmount) >= 2_000_000 && <i className="signal-chip">疑似拆单</i>}</div></div>
             <div className="quote"><b>{fmtPrice(q?.price ?? null)}</b><span className={directionClass(change, state.settings)}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></div>
             {open ? <ChevronUp className="chevron" size={14}/> : <ChevronDown className="chevron" size={14}/>} 
           </button>
           {open && <div className="detail">
-            <div className="chart-block"><header><span>今日分时</span><span>{detail?.price.at(-1)?.time?.slice(-5) ?? '加载中'}</span></header><Sparkline points={detail?.price ?? []} positive={(change ?? 0) >= 0}/></div>
+            <div className="chart-block"><header><span>30 日 K 线</span><span>{detail?.klines.at(-1)?.date ?? '加载中'}</span></header><Candlestick points={detail?.klines ?? []}/></div>
+            <div className="metric-grid"><div><span>成交额</span><b>{fmtMoney(q?.amount ?? null).replace('+','')}</b></div><div><span>量比</span><b>{q?.volumeRatio == null ? '—' : q.volumeRatio.toFixed(2)}</b></div><div><span>实际换手率</span><b>{q?.actualTurnoverRate == null ? '—' : `${q.actualTurnoverRate.toFixed(2)}%`}</b></div></div>
+            <div className="chart-block"><header><span>{detail?.price.length ? '今日分时' : '收盘走势（分时暂缺）'}</span><span>{detail?.price.at(-1)?.time?.slice(-5) ?? detail?.klines.at(-1)?.date ?? '加载中'}</span></header><Sparkline points={detail?.price.length ? detail.price : detail?.klines.map(v => ({ time: v.date, value: v.close })) ?? []} positive={(change ?? 0) >= 0}/></div>
             <div className="chart-block"><header><span>近 20 日主力资金</span><span>{item.market === 'HK' ? '趋势暂无数据' : fmtMoney(q?.mainNetInflow ?? null)}</span></header><Sparkline points={detail?.capital ?? []} positive={(q?.mainNetInflow ?? 0) >= 0}/></div>
             <div className="breakdown"><span>超大单 <b className={directionClass(q?.superLargeNet ?? null, state.settings)}>{fmtMoney(q?.superLargeNet ?? null)}</b></span><span>大单 <b className={directionClass(q?.largeNet ?? null, state.settings)}>{fmtMoney(q?.largeNet ?? null)}</b></span></div>
-            <div className="split-radar"><header><span>疑似拆单雷达</span><small>算法推测 · 逐笔扫描</small></header>{detail?.splitSignals?.length ? detail.splitSignals.map(signal => <div className={`split-signal ${signal.side === 'buy' ? directionClass(1, state.settings) : directionClass(-1, state.settings)}`} key={signal.side}><b>{signal.side === 'buy' ? '疑似拆单买入' : '疑似拆单卖出'}</b><span>{fmtMoney(signal.totalAmount)} · {signal.tradeCount} 笔</span><em>置信度 {signal.confidence}%</em></div>) : <p>最近逐笔成交中暂无明显拆单信号</p>}</div>
+            <div className="split-radar"><header><span>暗盘 · 疑似拆单</span><small>算法推测 · 逐笔扫描</small></header><div className="split-summary"><span>拆单买入 <b className={directionClass(1,state.settings)}>{fmtMoney(detail?.splitEstimate.buyAmount ?? 0)}</b></span><span>拆单卖出 <b className={directionClass(-1,state.settings)}>{fmtMoney(-(detail?.splitEstimate.sellAmount ?? 0))}</b></span></div>{detail?.splitSignals?.length ? detail.splitSignals.map(signal => <div className={`split-signal ${signal.side === 'buy' ? directionClass(1, state.settings) : directionClass(-1, state.settings)}`} key={signal.side}><b>{signal.side === 'buy' ? '疑似拆单买入' : '疑似拆单卖出'}</b><span>{fmtMoney(signal.totalAmount)} · {signal.tradeCount} 笔</span><em>置信度 {signal.confidence}%</em></div>) : <p>最近逐笔成交中暂无明显拆单信号</p>}</div>
             <div className="detail-actions"><button onClick={() => setAlertFor(id)}><Bell size={14}/>提醒</button><button onClick={() => save({ watchlist: state.watchlist.map(v => secid(v) === id ? { ...v, hidden: true } : v) })}><EyeOff size={14}/>隐藏</button><button className="danger" onClick={() => save({ watchlist: state.watchlist.filter(v => secid(v) !== id) })}><Trash2 size={14}/>删除</button></div>
           </div>}
         </article>
@@ -108,6 +124,7 @@ export default function App() {
     <footer className="app-footer"><span className={networkError ? 'warn' : ''}><i/>{networkError ? '数据延迟' : state.settings.paused ? '刷新已暂停' : `${isTradingTime() ? state.settings.refreshMs / 1000 : 60} 秒刷新`}</span><span>主力 = 大单 + 超大单净额</span></footer>
     {settingsOpen && <SettingsPanel value={state.settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} shortcutError={shortcutError}/>} 
     {addOpen && <AddStock state={state} onSave={save} onClose={() => setAddOpen(false)}/>} 
+    {hotOpen && <HotRankPanel items={hotRanks} state={state} onSave={save} onClose={() => setHotOpen(false)}/>} 
     {alertFor && <AlertEditor stock={state.watchlist.find(v => secid(v) === alertFor)!} alerts={state.alerts.filter(a => a.secid === alertFor)} onSave={alerts => save({ alerts: [...state.alerts.filter(a => a.secid !== alertFor), ...alerts] })} onClose={() => setAlertFor(undefined)}/>} 
   </div>
 }
@@ -117,6 +134,11 @@ function AddStock({ state, onSave, onClose }: { state: AppState; onSave(p: Parti
   const search = (value: string) => { setQuery(value); clearTimeout(timer.current); if (!value.trim()) return setResults([]); timer.current = window.setTimeout(async () => { setLoading(true); try { setResults(await window.marketFloat.searchStocks(value)) } finally { setLoading(false) } }, 300) }
   const add = (item: SearchResult) => { const exists = state.watchlist.some(v => secid(v) === secid(item)); const list = exists ? state.watchlist.map(v => secid(v) === secid(item) ? { ...v, hidden: false, name: item.name } : v) : [...state.watchlist, item]; onSave({ watchlist: list }); onClose() }
   return <div className="overlay"><section className="panel add-panel"><div className="panel-head"><h2>添加自选</h2><button onClick={onClose}><X size={18}/></button></div><div className="searchbox"><Search size={16}/><input autoFocus value={query} onChange={e => search(e.target.value)} placeholder="输入名称、600519、HK00700"/></div><div className="results">{loading && <p>搜索中…</p>}{results.map(v => <button key={secid(v)} onClick={() => add(v)}><span className="market-badge">{displayMarket(v.market)}</span><b>{v.name}</b><small>{v.code}</small><Plus size={16}/></button>)}{query && !loading && !results.length && <p>未找到匹配标的</p>}</div><p className="fineprint">支持沪深 6 位代码，以及 HK + 港股代码。</p></section></div>
+}
+
+function HotRankPanel({ items, state, onSave, onClose }: { items: HotRankItem[]; state: AppState; onSave(p: Partial<AppState>): void; onClose(): void }) {
+  const add = (item: HotRankItem) => { if (state.watchlist.some(v => secid(v) === secid(item))) return; onSave({ watchlist: [...state.watchlist, { market: item.market, code: item.code, name: item.name }] }) }
+  return <div className="overlay"><section className="panel hot-panel"><div className="panel-head"><div><small>A 股实时人气</small><h2>热度排行榜 TOP 10</h2></div><button onClick={onClose}><X size={18}/></button></div><div className="hot-list">{items.length ? items.map(item => { const added = state.watchlist.some(v => secid(v) === secid(item)); return <div key={secid(item)}><strong>{item.rank}</strong><span><b>{item.name}</b><small>{item.code}</small></span><em className={directionClass(item.changePercent, state.settings)}>{item.changePercent == null ? '—' : `${item.changePercent > 0 ? '+' : ''}${item.changePercent.toFixed(2)}%`}</em><button disabled={added} onClick={() => add(item)}>{added ? '已添加' : '+ 自选'}</button></div>}) : <p>热度数据加载中或暂时不可用</p>}</div><p className="fineprint">热度排名来自公开行情源，仅反映关注度，不代表买卖建议。</p></section></div>
 }
 
 function AlertEditor({ stock, alerts, onSave, onClose }: { stock: WatchItem; alerts: PriceAlert[]; onSave(v: PriceAlert[]): void; onClose(): void }) {

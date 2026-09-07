@@ -5,4 +5,6 @@ import './styles.css'
 import './alerts.css'
 import './split-radar.css'
 import './decoy-v2.css'
+import './candlestick.css'
+import './hot-rank.css'
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>)
