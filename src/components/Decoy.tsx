@@ -1,8 +1,19 @@
-import { CheckCircle2 } from 'lucide-react'
-export default function Decoy({ value, onChange, onRestore }: { value: string; onChange(value: string): void; onRestore(): void }) {
-  return <main className="decoy">
-    <div className="decoy-header"><div><small>WORKSPACE</small><h1>今日待办</h1></div><CheckCircle2 size={24}/></div>
-    <textarea value={value} onChange={e => onChange(e.target.value)} spellCheck={false} aria-label="今日待办"/>
-    <footer><span>内容已自动保存</span><button onClick={onRestore} title="返回">⌃⌥ M</button></footer>
+import { useMemo, useState } from 'react'
+import { Archive, ListChecks, Plus, Save } from 'lucide-react'
+import type { TodoItem, TodoLog } from '../types'
+
+export default function Decoy({ items, logs, onItemsChange, onSaveLog }: { items: TodoItem[]; logs: TodoLog[]; onItemsChange(items: TodoItem[]): void; onSaveLog(log: TodoLog): void }) {
+  const [view, setView] = useState<'plan' | 'logs'>('plan')
+  const [saved, setSaved] = useState(false)
+  const date = useMemo(() => new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date()), [])
+  const update = (id: string, patch: Partial<TodoItem>) => onItemsChange(items.map(item => item.id === id ? { ...item, ...patch } : item))
+  const add = () => onItemsChange([...items, { id: crypto.randomUUID(), text: '', tag: '今日', completed: false, createdAt: new Date().toISOString() }])
+  const saveLog = () => { onSaveLog({ id: crypto.randomUUID(), savedAt: new Date().toISOString(), items: items.map(v => ({ ...v })) }); setSaved(true); setTimeout(() => setSaved(false), 1600) }
+  return <main className="decoy-v2">
+    <div className="decoy-top"><div><small>DAILY WORKSPACE</small><h1>{view === 'plan' ? '今日规划' : '工作日志'}</h1><p>{date}</p></div><div className="decoy-tabs"><button className={view === 'plan' ? 'active' : ''} onClick={() => setView('plan')}><ListChecks size={13}/></button><button className={view === 'logs' ? 'active' : ''} onClick={() => setView('logs')}><Archive size={13}/></button></div></div>
+    {view === 'plan' ? <>
+      <section className="todo-list">{items.map(item => <div className={`todo-row ${item.completed ? 'done' : ''}`} key={item.id}><input className="tag-input" value={item.tag} maxLength={8} onChange={e => update(item.id, { tag: e.target.value })}/><input className="todo-text" value={item.text} placeholder="填写今天的工作安排…" onChange={e => update(item.id, { text: e.target.value })}/><input className="todo-check" type="checkbox" checked={item.completed} onChange={e => update(item.id, { completed: e.target.checked, completedAt: e.target.checked ? new Date().toISOString() : undefined })}/><button className="todo-delete" title="删除" onClick={() => onItemsChange(items.filter(v => v.id !== item.id))}>×</button></div>)}<button className="todo-add" onClick={add}><Plus size={13}/> 添加一项计划</button></section>
+      <footer className="decoy-actions"><span>{items.filter(v => v.completed).length} / {items.length} 已完成 · 自动保存</span><button onClick={saveLog}><Save size={12}/> {saved ? '已保存' : '保存今日日志'}</button></footer>
+    </> : <section className="log-list">{logs.length ? logs.map(log => <article className="log-card" key={log.id}><header><b>{new Date(log.savedAt).toLocaleDateString('zh-CN')}</b><span>{new Date(log.savedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span></header>{log.items.filter(v => v.text.trim()).map(v => <p className={v.completed ? 'done' : ''} key={v.id}>[{v.tag || '未分类'}] {v.completed ? '✓ ' : '· '}{v.text}</p>)}</article>) : <div className="log-empty">还没有保存过工作日志</div>}</section>}
   </main>
 }

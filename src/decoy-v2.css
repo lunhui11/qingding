@@ -1,0 +1,29 @@
+.decoy-v2 { height: 100vh; background: #f3f4f2; color: #26312c; padding: 22px 24px 15px; display: flex; flex-direction: column; -webkit-app-region: drag; }
+.decoy-v2 button, .decoy-v2 input { -webkit-app-region: no-drag; }
+.decoy-top { display: flex; align-items: center; justify-content: space-between; }
+.decoy-top small { font-size: 9px; letter-spacing: 1.7px; color: #8b9691; }
+.decoy-top h1 { font-size: 23px; margin: 3px 0 2px; }
+.decoy-top p { font-size: 10px; color: #89938e; margin: 0; }
+.decoy-tabs { display: flex; gap: 4px; }
+.decoy-tabs button { border: 0; background: #e4e8e5; color: #76817c; border-radius: 6px; padding: 6px 9px; font-size: 10px; cursor: pointer; }
+.decoy-tabs button.active { background: #cadbd4; color: #47695d; }
+.todo-list { flex: 1; overflow-y: auto; margin: 17px -4px 8px; padding: 0 4px; }
+.todo-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; min-height: 45px; border-bottom: 1px solid #dfe3df; }
+.tag-input { width: 48px; border: 0; border-radius: 4px; padding: 4px; background: #e2e9e5; color: #668074; font-size: 9px; text-align: center; }
+.todo-text { border: 0; outline: 0; background: transparent; color: #34403a; font-size: 12px; width: 100%; }
+.todo-row.done .todo-text { text-decoration: line-through; color: #9ba49f; }
+.todo-check { appearance: none; width: 18px; height: 18px; border: 1.5px solid #91a49b; border-radius: 50%; cursor: pointer; display: grid; place-items: center; }
+.todo-check:checked { background: #78a291; border-color: #78a291; }
+.todo-check:checked::after { content: '✓'; color: white; font-size: 12px; }
+.todo-delete { visibility: hidden; border: 0; background: none; color: #a98a8a; cursor: pointer; font-size: 15px; }
+.todo-row:hover .todo-delete { visibility: visible; }
+.todo-add { border: 0; background: none; color: #729184; padding: 10px 2px; text-align: left; font-size: 11px; cursor: pointer; display: flex; gap: 4px; align-items: center; }
+.decoy-actions { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #dde2de; padding-top: 10px; }
+.decoy-actions span { font-size: 9px; color: #929b97; }
+.decoy-actions button { border: 0; background: #dce8e3; color: #587568; border-radius: 5px; padding: 7px 10px; font-size: 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.log-list { flex: 1; overflow-y: auto; margin: 15px 0; }
+.log-card { background: #fff; border: 1px solid #e0e4e1; border-radius: 7px; padding: 10px; margin-bottom: 8px; }
+.log-card header { display: flex; justify-content: space-between; font-size: 10px; color: #77827d; margin-bottom: 7px; }
+.log-card p { font-size: 10px; margin: 4px 0; color: #4c5852; }
+.log-card p.done { text-decoration: line-through; color: #99a29d; }
+.log-empty { display: grid; place-items: center; height: 70%; color: #99a29d; font-size: 11px; }

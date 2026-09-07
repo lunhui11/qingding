@@ -5,10 +5,11 @@ export default function SettingsPanel({ value, onChange, onClose, shortcutError 
   return <div className="overlay"><section className="panel settings-panel">
     <div className="panel-head"><h2>偏好设置</h2><button onClick={onClose}><X size={18}/></button></div>
     <label>窗口透明度 <output>{Math.round(value.opacity * 100)}%</output><input type="range" min="55" max="100" value={value.opacity * 100} onChange={e => set('opacity', Number(e.target.value) / 100)}/></label>
-    <label>交易时刷新<input type="number" min="3" max="60" value={value.refreshMs / 1000} onChange={e => set('refreshMs', Math.max(3, Number(e.target.value)) * 1000)}/><span>秒</span></label>
+    <label>交易时刷新<input type="number" min="1" max="60" value={value.refreshMs / 1000} onChange={e => set('refreshMs', Math.max(1, Number(e.target.value)) * 1000)}/><span>秒</span></label>
     <label>隐藏时刷新<input type="number" min="10" max="300" value={value.idleRefreshMs / 1000} onChange={e => set('idleRefreshMs', Math.max(10, Number(e.target.value)) * 1000)}/><span>秒</span></label>
     <label>涨跌颜色<select value={value.colorMode} onChange={e => set('colorMode', e.target.value as Settings['colorMode'])}><option value="cn">红涨绿跌</option><option value="global">绿涨红跌</option></select></label>
-    <label>全局快捷键<input value={value.shortcut} onChange={e => set('shortcut', e.target.value)}/></label>
+    <label>伪装快捷键<input value={value.shortcut} onChange={e => set('shortcut', e.target.value)}/></label>
+    <label>隐藏快捷键<input value={value.hideShortcut} onChange={e => set('hideShortcut', e.target.value)}/></label>
     {shortcutError && <p className="error">{shortcutError}</p>}
     <label className="toggle"><span>系统通知</span><input type="checkbox" checked={value.notifications} onChange={e => set('notifications', e.target.checked)}/></label>
     <label className="toggle"><span>开机启动</span><input type="checkbox" checked={value.launchAtLogin} onChange={e => set('launchAtLogin', e.target.checked)}/></label>

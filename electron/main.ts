@@ -1,12 +1,14 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, Tray } from 'electron'
 import path from 'node:path'
-import fs from 'node:fs/promises'
 import { fetchDetail, fetchQuotes, searchStocks } from './market'
 import { getState, patchState } from './store'
 
+process.env.ELECTRON_DISABLE_LOGGING = 'true'
+app.commandLine.appendSwitch('disable-logging')
+
 let win: BrowserWindow | null = null
 let tray: Tray | null = null
-let decoy = false
+let decoy = true
 let quitting = false
 let saveBoundsTimer: NodeJS.Timeout | undefined
 
@@ -34,11 +36,7 @@ function createWindow() {
   win.setMovable(!getState().settings.locked); win.setResizable(!getState().settings.locked)
   const devUrl = process.env.VITE_DEV_SERVER_URL
   if (devUrl) win.loadURL(devUrl); else win.loadFile(path.join(__dirname, '../dist/index.html'))
-  win.once('ready-to-show', () => {
-    win?.show()
-    const screenshotPath = process.env.MARKET_FLOAT_SCREENSHOT
-    if (screenshotPath) setTimeout(async () => { if (!win) return; const image = await win.webContents.capturePage(); await fs.writeFile(screenshotPath, image.toPNG()); quitting = true; app.quit() }, 5000)
-  })
+  win.once('ready-to-show', () => win?.show())
   win.on('close', e => { if (!quitting) { e.preventDefault(); win?.hide() } })
   win.on('move', scheduleSaveBounds); win.on('resize', scheduleSaveBounds)
 }
@@ -47,10 +45,14 @@ function scheduleSaveBounds() {
   clearTimeout(saveBoundsTimer); saveBoundsTimer = setTimeout(() => { if (win && !win.isMaximized()) patchState({ windowBounds: win.getBounds() }) }, 300)
 }
 
-function registerShortcut(accelerator: string) {
+function registerShortcuts(decoyAccelerator: string, hideAccelerator: string) {
   globalShortcut.unregisterAll()
-  try { return globalShortcut.register(accelerator, toggleDecoy) }
-  catch { return false }
+  try {
+    const decoyOk = globalShortcut.register(decoyAccelerator, toggleDecoy)
+    const hideOk = globalShortcut.register(hideAccelerator, () => { if (!win) return; if (win.isVisible()) win.hide(); else { win.show(); win.focus() } })
+    if (!decoyOk || !hideOk) { globalShortcut.unregisterAll(); return false }
+    return true
+  } catch { globalShortcut.unregisterAll(); return false }
 }
 
 function trayIcon() {
@@ -62,8 +64,6 @@ function buildTrayMenu() {
   if (!tray) return
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: win?.isVisible() ? '隐藏窗口' : '显示窗口', click: () => win?.isVisible() ? win.hide() : win?.show() },
-    { label: decoy ? '返回行情' : '切换到工作便签', click: toggleDecoy },
-    { type: 'separator' },
     { label: getState().settings.paused ? '继续刷新' : '暂停刷新', click: () => { const s = getState(); patchState({ settings: { ...s.settings, paused: !s.settings.paused } }); win?.webContents.send('decoy:changed', decoy) } },
     { type: 'separator' }, { label: '退出轻盯', click: () => { quitting = true; app.quit() } }
   ]))
@@ -83,14 +83,14 @@ function setupIpc() {
   ipcMain.handle('window:set-decoy', (_, value) => setDecoy(Boolean(value)))
   ipcMain.handle('window:opacity', (_, value) => win?.setOpacity(Math.min(1, Math.max(0.55, Number(value)))))
   ipcMain.handle('window:locked', (_, value) => { win?.setMovable(!value); win?.setResizable(!value) })
-  ipcMain.handle('shortcut:update', (_, value) => { const ok = registerShortcut(String(value)); return ok ? { ok: true } : { ok: false, error: '快捷键已被其他程序占用' } })
+  ipcMain.handle('shortcut:update', (_, value, hideValue) => { const ok = registerShortcuts(String(value), String(hideValue)); return ok ? { ok: true } : { ok: false, error: '其中一个快捷键已被其他程序占用' } })
   ipcMain.handle('app:launch-at-login', (_, value) => app.setLoginItemSettings({ openAtLogin: Boolean(value), path: process.execPath }))
   ipcMain.handle('notify', (_, title, body) => { if (Notification.isSupported()) new Notification({ title, body, silent: true }).show() })
   ipcMain.handle('window:hide', () => win?.hide())
   ipcMain.handle('app:quit', () => { quitting = true; app.quit() })
 }
 
-app.whenReady().then(() => { setupIpc(); createWindow(); createTray(); registerShortcut(getState().settings.shortcut) })
+app.whenReady().then(() => { setupIpc(); createWindow(); createTray(); const s = getState().settings; registerShortcuts(s.shortcut, s.hideShortcut) })
 app.on('activate', () => win ? win.show() : createWindow())
 app.on('before-quit', () => { quitting = true; globalShortcut.unregisterAll() })
 app.on('window-all-closed', () => { /* tray application remains active until explicit quit */ })

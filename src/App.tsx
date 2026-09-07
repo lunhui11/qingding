@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, ChevronDown, ChevronUp, Eye, EyeOff, Pause, Play, Plus, Search, Trash2, X } from 'lucide-react'
-import type { AppState, DetailData, PriceAlert, Quote, SearchResult, WatchItem } from './types'
+import type { AppState, DetailData, PriceAlert, Quote, SearchResult, TodoItem, TodoLog, WatchItem } from './types'
 import { alertTriggered, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid } from './utils'
 import Sparkline from './components/Sparkline'
 import TitleBar from './components/TitleBar'
 import Decoy from './components/Decoy'
 import SettingsPanel from './components/SettingsPanel'
 
-const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', settings: { refreshMs: 3000, idleRefreshMs: 15000, opacity: .96, colorMode: 'cn', shortcut: 'CommandOrControl+Alt+M', notifications: true, launchAtLogin: false, locked: false, paused: false } }
+const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, colorMode: 'cn', shortcut: 'CommandOrControl+Alt+M', hideShortcut: 'CommandOrControl+Alt+H', notifications: true, launchAtLogin: false, locked: false, paused: false } }
 
 export default function App() {
   const [state, setState] = useState<AppState>(fallbackState)
   const [quotes, setQuotes] = useState<Record<string, Quote>>({})
   const [details, setDetails] = useState<Record<string, DetailData>>({})
   const [expanded, setExpanded] = useState<string>()
-  const [decoy, setDecoy] = useState(false)
+  const [decoy, setDecoy] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [alertFor, setAlertFor] = useState<string>()
@@ -22,6 +22,7 @@ export default function App() {
   const [networkError, setNetworkError] = useState(false)
   const [shortcutError, setShortcutError] = useState<string>()
   const busy = useRef(false)
+  const detailBusy = useRef(false)
   const previousTriggers = useRef<Record<string, boolean>>({})
 
   useEffect(() => { window.marketFloat.loadState().then(setState); return window.marketFloat.onDecoyChanged(value => { setDecoy(value); window.marketFloat.loadState().then(setState) }) }, [])
@@ -59,19 +60,26 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [refresh, decoy, state.settings.refreshMs, state.settings.idleRefreshMs])
 
-  const toggleDetail = async (item: WatchItem) => {
+  useEffect(() => {
+    if (!expanded || decoy) return
+    const item = state.watchlist.find(v => secid(v) === expanded); if (!item) return
+    const load = async () => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => ({ ...old, [expanded]: loaded })) } finally { detailBusy.current = false } }
+    load(); const timer = window.setInterval(load, Math.max(1000, state.settings.refreshMs)); return () => clearInterval(timer)
+  }, [expanded, decoy, state.watchlist, state.settings.refreshMs])
+
+  const toggleDetail = (item: WatchItem) => {
     const id = secid(item); if (expanded === id) return setExpanded(undefined)
-    setExpanded(id); try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => ({ ...old, [id]: loaded })) } catch { /* inline empty state */ }
+    setExpanded(id)
   }
   const updateSettings = async (settings: AppState['settings']) => {
     setState(s => ({ ...s, settings })); await save({ settings }); window.marketFloat.setWindowOpacity(settings.opacity); window.marketFloat.setWindowLocked(settings.locked); window.marketFloat.setLaunchAtLogin(settings.launchAtLogin)
-    const result = await window.marketFloat.updateShortcut(settings.shortcut); setShortcutError(result.error)
+    const result = await window.marketFloat.updateShortcut(settings.shortcut, settings.hideShortcut); setShortcutError(result.error)
   }
   const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} 更新` : '正在连接'
 
-  if (decoy) return <Decoy value={state.todos} onChange={value => { setState(s => ({ ...s, todos: value })); save({ todos: value }) }} onRestore={() => window.marketFloat.setDecoy(false).then(setDecoy)}/>
+  if (decoy) return <Decoy items={state.todoItems} logs={state.todoLogs} onItemsChange={(todoItems: TodoItem[]) => save({ todoItems })} onSaveLog={(log: TodoLog) => save({ todoLogs: [log, ...state.todoLogs].slice(0, 180) })}/>
   return <div className="app-shell">
-    <TitleBar locked={state.settings.locked} status={status} onLock={() => updateSettings({ ...state.settings, locked: !state.settings.locked })} onSettings={() => setSettingsOpen(true)} onDecoy={() => window.marketFloat.setDecoy(true).then(setDecoy)} onHide={() => window.marketFloat.hideWindow()}/>
+    <TitleBar locked={state.settings.locked} status={status} onLock={() => updateSettings({ ...state.settings, locked: !state.settings.locked })} onSettings={() => setSettingsOpen(true)} onHide={() => window.marketFloat.hideWindow()}/>
     <div className="toolbar">
       <div><span className="eyebrow">WATCHLIST</span><h1>自选行情</h1></div>
       <div className="tool-actions"><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
@@ -90,6 +98,7 @@ export default function App() {
             <div className="chart-block"><header><span>今日分时</span><span>{detail?.price.at(-1)?.time?.slice(-5) ?? '加载中'}</span></header><Sparkline points={detail?.price ?? []} positive={(change ?? 0) >= 0}/></div>
             <div className="chart-block"><header><span>近 20 日主力资金</span><span>{item.market === 'HK' ? '趋势暂无数据' : fmtMoney(q?.mainNetInflow ?? null)}</span></header><Sparkline points={detail?.capital ?? []} positive={(q?.mainNetInflow ?? 0) >= 0}/></div>
             <div className="breakdown"><span>超大单 <b className={directionClass(q?.superLargeNet ?? null, state.settings)}>{fmtMoney(q?.superLargeNet ?? null)}</b></span><span>大单 <b className={directionClass(q?.largeNet ?? null, state.settings)}>{fmtMoney(q?.largeNet ?? null)}</b></span></div>
+            <div className="split-radar"><header><span>疑似拆单雷达</span><small>算法推测 · 逐笔扫描</small></header>{detail?.splitSignals?.length ? detail.splitSignals.map(signal => <div className={`split-signal ${signal.side === 'buy' ? directionClass(1, state.settings) : directionClass(-1, state.settings)}`} key={signal.side}><b>{signal.side === 'buy' ? '疑似拆单买入' : '疑似拆单卖出'}</b><span>{fmtMoney(signal.totalAmount)} · {signal.tradeCount} 笔</span><em>置信度 {signal.confidence}%</em></div>) : <p>最近逐笔成交中暂无明显拆单信号</p>}</div>
             <div className="detail-actions"><button onClick={() => setAlertFor(id)}><Bell size={14}/>提醒</button><button onClick={() => save({ watchlist: state.watchlist.map(v => secid(v) === id ? { ...v, hidden: true } : v) })}><EyeOff size={14}/>隐藏</button><button className="danger" onClick={() => save({ watchlist: state.watchlist.filter(v => secid(v) !== id) })}><Trash2 size={14}/>删除</button></div>
           </div>}
         </article>

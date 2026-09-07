@@ -1,6 +1,6 @@
 {
   "name": "market-float",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "A discreet A-share and Hong Kong stock ticker for Windows",
   "main": "dist-electron/main.js",
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "concurrently -k \"vite\" \"tsc -p tsconfig.main.json --watch\" \"wait-on tcp:5173 dist-electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
     "build": "tsc -p tsconfig.main.json && vite build",
-    "test": "vitest run",
+    "test": "vitest run --exclude dist-electron/** --exclude node_modules/**",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
     "dist": "npm run build && electron-builder --win portable"
   },
@@ -37,9 +37,23 @@
     "appId": "cn.codex.marketfloat",
     "productName": "轻盯",
     "asar": true,
-    "directories": { "output": "release" },
-    "files": ["dist/**/*", "dist-electron/**/*", "package.json"],
-    "win": { "target": ["portable"], "artifactName": "轻盯-便携版-${version}.${ext}" },
-    "portable": { "artifactName": "轻盯-便携版-${version}.${ext}" }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "artifactName": "轻盯-便携版-${version}.${ext}",
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "轻盯-便携版-${version}.${ext}"
+    }
   }
 }

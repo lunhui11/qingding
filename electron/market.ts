@@ -1,4 +1,4 @@
-import type { DetailData, Market, Quote, SearchResult, WatchItem } from './types'
+import type { DetailData, Market, Quote, SearchResult, SplitSignal, TradePrint, WatchItem } from './types'
 
 const fields = 'f12,f13,f14,f2,f3,f4,f18,f62,f184,f66,f72'
 const headers = { Referer: 'https://quote.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 MarketFloat/1.0' }
@@ -35,14 +35,36 @@ export async function fetchDetail(item: WatchItem): Promise<DetailData> {
   const secid = toSecid(item)
   const priceUrl = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11&fields2=f51,f53&ndays=1&iscr=0`
   const fundUrl = `https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55&lmt=20&klt=101`
-  const [priceResult, fundResult] = await Promise.allSettled([getJson(priceUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(fundUrl)])
+  const tradesUrl = `https://push2.eastmoney.com/api/qt/stock/details/get?secid=${secid}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&pos=-160`
+  const [priceResult, fundResult, tradesResult] = await Promise.allSettled([getJson(priceUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(fundUrl), getJson(tradesUrl)])
   const trends: string[] = priceResult.status === 'fulfilled' ? priceResult.value?.data?.trends ?? [] : []
   const klines: string[] = fundResult.status === 'fulfilled' ? fundResult.value?.data?.klines ?? [] : []
+  const tradeRows: string[] = tradesResult.status === 'fulfilled' ? tradesResult.value?.data?.details ?? [] : []
+  const trades = tradeRows.map(v => { const [time, price, volume, , side] = v.split(','); return { time, price: Number(price), volume: Number(volume), side: Number(side) as TradePrint['side'] } }).filter(v => Number.isFinite(v.price) && Number.isFinite(v.volume))
   return {
     price: trends.map(v => { const [time, price] = v.split(','); return { time, value: Number(price) } }).filter(v => Number.isFinite(v.value)),
     capital: klines.map(v => { const [time, value] = v.split(','); return { time, value: Number(value) } }).filter(v => Number.isFinite(v.value)),
+    splitSignals: detectSplitSignals(trades, item.market),
     updatedAt: new Date().toISOString()
   }
+}
+
+const seconds = (time: string) => { const [h, m, s] = time.split(':').map(Number); return h * 3600 + m * 60 + s }
+export function detectSplitSignals(trades: TradePrint[], market: Market): SplitSignal[] {
+  const factor = market === 'HK' ? 1 : 100
+  const usable = trades.filter(t => t.side === 1 || t.side === 2).map(t => ({ ...t, at: seconds(t.time), amount: t.price * t.volume * factor }))
+  const candidates: SplitSignal[] = []
+  for (let end = 0; end < usable.length; end++) {
+    const recent = usable.filter((_, i) => i <= end && usable[end].at - usable[i].at <= 60)
+    for (const sideCode of [1, 2] as const) {
+      const same = recent.filter(t => t.side === sideCode && t.amount <= (market === 'HK' ? 300_000 : 1_000_000))
+      const total = same.reduce((sum, t) => sum + t.amount, 0); const ratio = same.length / Math.max(1, recent.length)
+      const minimum = market === 'HK' ? 500_000 : 2_000_000
+      if (same.length >= 6 && ratio >= .7 && total >= minimum) candidates.push({ side: sideCode === 2 ? 'buy' : 'sell', startTime: same[0].time, endTime: same.at(-1)!.time, tradeCount: same.length, totalAmount: total, confidence: Math.min(95, Math.round(35 + ratio * 35 + Math.min(20, same.length * 2) + Math.min(5, total / minimum))) })
+    }
+  }
+  const latest = new Map<'buy' | 'sell', SplitSignal>(); for (const signal of candidates) latest.set(signal.side, signal)
+  return [...latest.values()].sort((a, b) => b.confidence - a.confidence)
 }
 
 export function parseDirectCode(query: string): SearchResult[] {

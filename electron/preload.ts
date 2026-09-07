@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('marketFloat', {
   setDecoy: (value: boolean) => ipcRenderer.invoke('window:set-decoy', value),
   setWindowOpacity: (value: number) => ipcRenderer.invoke('window:opacity', value),
   setWindowLocked: (value: boolean) => ipcRenderer.invoke('window:locked', value),
-  updateShortcut: (value: string) => ipcRenderer.invoke('shortcut:update', value),
+  updateShortcut: (value: string, hideValue: string) => ipcRenderer.invoke('shortcut:update', value, hideValue),
   setLaunchAtLogin: (value: boolean) => ipcRenderer.invoke('app:launch-at-login', value),
   notify: (title: string, body: string) => ipcRenderer.invoke('notify', title, body),
   hideWindow: () => ipcRenderer.invoke('window:hide'),
