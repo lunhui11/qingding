@@ -16,8 +16,8 @@ export interface PriceAlert { id: string; secid: string; metric: AlertMetric; th
 export interface TodoItem { id: string; text: string; tag: string; completed: boolean; createdAt: string; completedAt?: string }
 export interface TodoLog { id: string; savedAt: string; items: TodoItem[] }
 export interface Settings {
-  refreshMs: number; idleRefreshMs: number; opacity: number; colorMode: 'cn' | 'global'; tickerShortcut: string; notesShortcut: string; hideShortcut: string;
-  notifications: boolean; launchAtLogin: boolean; locked: boolean; paused: boolean;
+  refreshMs: number; idleRefreshMs: number; opacity: number; theme: 'dark' | 'light'; colorMode: 'cn' | 'global'; tickerShortcut: string; notesShortcut: string; hideShortcut: string;
+  notifications: boolean; smartAlerts: boolean; launchAtLogin: boolean; locked: boolean; paused: boolean;
 }
 export interface AppState { watchlist: WatchItem[]; alerts: PriceAlert[]; todos: string; todoItems: TodoItem[]; todoLogs: TodoLog[]; settings: Settings; windowBounds?: { x: number; y: number; width: number; height: number } }
 export interface SearchResult { market: Market; code: string; name: string }

@@ -1,4 +1,4 @@
-import type { Market, PriceAlert, Quote, Settings, WatchItem } from './types'
+import type { Market, PriceAlert, Quote, Settings, SplitEstimate, WatchItem } from './types'
 
 export const secid = (v: Pick<WatchItem, 'market' | 'code'>) => `${v.market}.${v.code}`
 export const fmtPrice = (value: number | null) => value == null ? '—' : value < 10 ? value.toFixed(3) : value.toFixed(2)
@@ -23,5 +23,14 @@ export const alertTriggered = (alert: PriceAlert, quote: Quote) => {
   const value = alert.metric.startsWith('price') ? quote.price : quote.changePercent
   if (value == null) return false
   return alert.metric.endsWith('Above') ? value >= alert.threshold : value <= alert.threshold
+}
+
+export type SmartSignal = 'inflow' | 'outflow' | null
+export const smartSignal = (quote?: Quote, split?: SplitEstimate): SmartSignal => {
+  if (!quote || !split || quote.volumeRatio == null || quote.changePercent == null || quote.mainNetInflow == null) return null
+  if (quote.volumeRatio < 1.8 || Math.abs(quote.changePercent) < 0.3 || Math.abs(quote.mainNetInflow) < 3_000_000 || Math.abs(split.netAmount) < 1_000_000) return null
+  if (quote.changePercent > 0 && quote.mainNetInflow > 0 && split.netAmount > 0) return 'inflow'
+  if (quote.changePercent < 0 && quote.mainNetInflow < 0 && split.netAmount < 0) return 'outflow'
+  return null
 }
 export const displayMarket = (market: Market) => market === 'HK' ? '港' : market === 'SH' ? '沪' : '深'

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, Pause, Play, Plus, Search, Trash2, X } from 'lucide-react'
+import { Activity, Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, Moon, Pause, Play, Plus, Search, Sun, Trash2, X } from 'lucide-react'
 import type { AppState, DetailData, HotRankItem, PriceAlert, Quote, SearchResult, SplitEstimate, TodoItem, TodoLog, WatchItem } from './types'
-import { alertTriggered, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid } from './utils'
+import { alertTriggered, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid, smartSignal } from './utils'
 import Sparkline from './components/Sparkline'
 import TitleBar from './components/TitleBar'
 import Decoy from './components/Decoy'
 import SettingsPanel from './components/SettingsPanel'
 import Candlestick from './components/Candlestick'
 
-const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, launchAtLogin: false, locked: false, paused: false } }
+const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false } }
 
 export default function App() {
   const [state, setState] = useState<AppState>(fallbackState)
@@ -29,10 +29,13 @@ export default function App() {
   const detailBusy = useRef(false)
   const splitBusy = useRef(false)
   const splitCursor = useRef(0)
+  const quotesRef = useRef<Record<string, Quote>>({})
+  const smartAlertTimes = useRef<Record<string, number>>({})
   const previousTriggers = useRef<Record<string, boolean>>({})
 
   useEffect(() => { window.marketFloat.loadState().then(setState); return window.marketFloat.onDecoyChanged(value => { setDecoy(value); window.marketFloat.loadState().then(setState) }) }, [])
   const save = useCallback(async (patch: Partial<AppState>) => setState(await window.marketFloat.saveState(patch)), [])
+  useEffect(() => { quotesRef.current = quotes }, [quotes])
 
   const checkAlerts = useCallback((incoming: Quote[]) => {
     if (!state.settings.notifications) return
@@ -75,9 +78,9 @@ export default function App() {
 
   useEffect(() => {
     if (decoy || state.settings.paused) return
-    const loadNext = async () => { const visible = state.watchlist.filter(v => !v.hidden).slice(0, 12); if (!visible.length || splitBusy.current) return; const item = visible[splitCursor.current++ % visible.length]; splitBusy.current = true; try { const estimate = await window.marketFloat.fetchSplitEstimate(item); setSplits(old => ({ ...old, [secid(item)]: estimate })) } catch { /* retain the last valid estimate */ } finally { splitBusy.current = false } }
+    const loadNext = async () => { const visible = state.watchlist.filter(v => !v.hidden).slice(0, 12); if (!visible.length || splitBusy.current) return; const item = visible[splitCursor.current++ % visible.length]; const id = secid(item); splitBusy.current = true; try { const estimate = await window.marketFloat.fetchSplitEstimate(item); setSplits(old => ({ ...old, [id]: estimate })); const signal = smartSignal(quotesRef.current[id], estimate); const now = Date.now(); if (signal && state.settings.notifications && state.settings.smartAlerts && now - (smartAlertTimes.current[id] ?? 0) > 900_000) { const q = quotesRef.current[id]; window.marketFloat.notify(`${q?.name || item.name} · 资金${signal === 'inflow' ? '流入' : '流出'}共振`, `量比 ${q?.volumeRatio?.toFixed(2)}，明盘与拆单估算同向${signal === 'inflow' ? '流入' : '流出'}`); smartAlertTimes.current[id] = now } } catch { /* retain the last valid estimate */ } finally { splitBusy.current = false } }
     loadNext(); const timer = window.setInterval(loadNext, 1000); return () => clearInterval(timer)
-  }, [decoy, state.settings.paused, state.watchlist])
+  }, [decoy, state.settings.paused, state.settings.notifications, state.settings.smartAlerts, state.watchlist])
 
   useEffect(() => { if (hotOpen) window.marketFloat.fetchHotRank().then(setHotRanks).catch(() => setHotRanks([])) }, [hotOpen])
 
@@ -90,21 +93,23 @@ export default function App() {
     const result = await window.marketFloat.updateShortcut(settings.tickerShortcut, settings.notesShortcut, settings.hideShortcut); setShortcutError(result.error)
   }
   const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} 更新` : '正在连接'
+  const signalSummary = useMemo(() => state.watchlist.filter(v => !v.hidden).reduce((sum, item) => { const signal = smartSignal(quotes[secid(item)], splits[secid(item)]); if (signal) sum[signal]++; return sum }, { inflow: 0, outflow: 0 }), [state.watchlist, quotes, splits])
 
   if (decoy) return <Decoy items={state.todoItems} logs={state.todoLogs} tickerShortcut={state.settings.tickerShortcut} onItemsChange={(todoItems: TodoItem[]) => save({ todoItems })} onLogsChange={(todoLogs: TodoLog[]) => save({ todoLogs })} onSaveLog={(log: TodoLog) => save({ todoLogs: [log, ...state.todoLogs].slice(0, 180) })}/>
-  return <div className="app-shell">
+  return <div className="app-shell" data-theme={state.settings.theme}>
     <TitleBar locked={state.settings.locked} status={status} onLock={() => updateSettings({ ...state.settings, locked: !state.settings.locked })} onSettings={() => setSettingsOpen(true)} onHide={() => window.marketFloat.hideWindow()}/>
     <div className="toolbar">
       <div><span className="eyebrow">WATCHLIST</span><h1>自选行情</h1></div>
-      <div className="tool-actions"><button title="热度榜 TOP 10" onClick={() => setHotOpen(true)}><Flame size={16}/></button><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
+      <div className="tool-actions"><button title={state.settings.theme === 'dark' ? '切换亮色' : '切换暗色'} onClick={() => updateSettings({ ...state.settings, theme: state.settings.theme === 'dark' ? 'light' : 'dark' })}>{state.settings.theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}</button><button title="热度榜 TOP 10" onClick={() => setHotOpen(true)}><Flame size={16}/></button><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
     </div>
+    {!!state.watchlist.filter(v => !v.hidden).length && <div className="scan-summary"><span><Activity size={12}/>智能扫描</span><b className="rise">流入共振 {signalSummary.inflow}</b><b className="fall">流出共振 {signalSummary.outflow}</b></div>}
     <div className="column-head"><span>标的 / 资金动向</span><span>最新 / 涨跌</span></div>
     <section className="watchlist">
       {state.watchlist.filter(v => !v.hidden).map(item => {
-        const id = secid(item); const q = quotes[id]; const split = splits[id]; const change = q?.changePercent ?? null; const open = expanded === id; const detail = details[id]
+        const id = secid(item); const q = quotes[id]; const split = splits[id]; const change = q?.changePercent ?? null; const open = expanded === id; const detail = details[id]; const signal = smartSignal(q, split)
         return <article className={`stock-card ${open ? 'expanded' : ''}`} key={id}>
           <button className="stock-main" onClick={() => toggleDetail(item)}>
-            <div className="identity"><div><span className="market-badge">{displayMarket(item.market)}</span><b>{q?.name || item.name}</b></div><small>{item.code}</small><div className={`capital ${directionClass(q?.mainNetInflow ?? null, state.settings)}`}><span>明盘</span>{fmtMoney(q?.mainNetInflow ?? null)}<em className={directionClass(split?.netAmount ?? null, state.settings)}>暗盘 {split ? fmtMoney(split.netAmount) : '扫描中'}</em></div><div className="signal-chips">{(q?.volumeRatio ?? 0) >= 2 && <i className="signal-chip hot">量比放大</i>}{split && Math.abs(split.netAmount) >= 2_000_000 && <i className="signal-chip">疑似拆单</i>}</div></div>
+            <div className="identity"><div><span className="market-badge">{displayMarket(item.market)}</span><b>{q?.name || item.name}</b></div><small>{item.code}</small><div className={`capital ${directionClass(q?.mainNetInflow ?? null, state.settings)}`}><span>明盘</span>{fmtMoney(q?.mainNetInflow ?? null)}<em className={directionClass(split?.netAmount ?? null, state.settings)}>暗盘 {split ? fmtMoney(split.netAmount) : '扫描中'}</em></div><div className="signal-chips">{signal && <i className={`signal-chip resonance ${directionClass(signal === 'inflow' ? 1 : -1, state.settings)}`}>{signal === 'inflow' ? '流入共振' : '流出共振'}</i>}{(q?.volumeRatio ?? 0) >= 2 && <i className="signal-chip hot">量比放大</i>}{split && Math.abs(split.netAmount) >= 2_000_000 && <i className="signal-chip">疑似拆单</i>}</div></div>
             <div className="quote"><b>{fmtPrice(q?.price ?? null)}</b><span className={directionClass(change, state.settings)}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></div>
             {open ? <ChevronUp className="chevron" size={14}/> : <ChevronDown className="chevron" size={14}/>} 
           </button>

@@ -11,7 +11,7 @@ export const defaults: AppState = {
   todos: '今日待办\n\n□ 整理项目进度\n□ 跟进本周数据\n□ 准备会议材料',
   todoItems: [],
   todoLogs: [],
-  settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: 0.96, colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, launchAtLogin: false, locked: false, paused: false }
+  settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: 0.96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false }
 }
 
 const store = new Store<AppState>({ name: 'market-float-settings', defaults })
