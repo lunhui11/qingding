@@ -1,12 +1,13 @@
 export type Market = 'SH' | 'SZ' | 'HK'
 export interface WatchItem { market: Market; code: string; name: string; hidden?: boolean; costPrice?: number; holdingLots?: number; lotSize?: number }
 export interface TrendPoint { time: string; value: number }
+export interface IntradayPoint { time: string; open: number; close: number; high: number; low: number; volume: number; amount: number; average: number }
 export interface TradePrint { time: string; price: number; volume: number; side: 1 | 2 | 4 }
 export interface SplitSignal { side: 'buy' | 'sell'; startTime: string; endTime: string; tradeCount: number; totalAmount: number; confidence: number }
 export interface SplitEstimate { buyAmount: number; sellAmount: number; netAmount: number; signals: SplitSignal[]; updatedAt: string }
 export interface KlinePoint { date: string; open: number; close: number; high: number; low: number; volume: number; amount: number }
 export interface Quote { market: Market; code: string; name: string; price: number | null; previousClose: number | null; change: number | null; changePercent: number | null; mainNetInflow: number | null; mainNetRatio: number | null; superLargeNet: number | null; largeNet: number | null; amount: number | null; volumeRatio: number | null; actualTurnoverRate: number | null; updatedAt: string; status: 'live' | 'delayed' | 'offline' }
-export interface DetailData { price: TrendPoint[]; averagePrice: TrendPoint[]; capital: TrendPoint[]; minuteCapital: TrendPoint[]; flow5m: number | null; flow10m: number | null; klines: KlinePoint[]; splitSignals: SplitSignal[]; splitEstimate: SplitEstimate; updatedAt: string }
+export interface DetailData { intraday: IntradayPoint[]; price: TrendPoint[]; averagePrice: TrendPoint[]; capital: TrendPoint[]; minuteCapital: TrendPoint[]; flow5m: number | null; flow10m: number | null; flow5mTradeCount: number; flow10mTradeCount: number; flowCoverageMinutes: number; klines: KlinePoint[]; splitSignals: SplitSignal[]; splitEstimate: SplitEstimate; updatedAt: string }
 export interface HotRankItem extends Quote { rank: number; rankChange: number }
 export interface SectorRankItem { code: string; name: string; kind: 'industry' | 'concept'; changePercent: number | null; mainNetInflow: number | null; mainNetRatio: number | null }
 export type SectorLeaderLabel = '涨幅龙头' | '人气龙头' | '资金龙头'

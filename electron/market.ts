@@ -65,31 +65,59 @@ export async function fetchQuotes(items: WatchItem[]): Promise<Quote[]> {
 
 export async function fetchDetail(item: WatchItem): Promise<DetailData> {
   const secid = toSecid(item)
-  const priceUrl = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11&fields2=f51,f52,f53&ndays=1&iscr=0`
+  const priceUrl = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11&fields2=f51,f52,f53,f54,f55,f56,f57,f58&ndays=1&iscr=0`
   const fundUrl = `https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55&lmt=20&klt=101`
-  const minuteFundUrl = `https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55&lmt=20&klt=1`
   const klineUrl = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&lmt=30&end=20500101`
-  const tradesUrl = `https://push2.eastmoney.com/api/qt/stock/details/get?secid=${secid}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&pos=-160`
-  const [priceResult, fundResult, minuteFundResult, klineResult, tradesResult] = await Promise.allSettled([getJson(priceUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(fundUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(minuteFundUrl), getJson(klineUrl), getJson(tradesUrl)])
+  const tradesUrl = `https://push2.eastmoney.com/api/qt/stock/details/get?secid=${secid}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&pos=-500`
+  const [priceResult, fundResult, klineResult, tradesResult] = await Promise.allSettled([getJson(priceUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(fundUrl), getJson(klineUrl), getJson(tradesUrl)])
   const trends: string[] = priceResult.status === 'fulfilled' ? priceResult.value?.data?.trends ?? [] : []
   const klines: string[] = fundResult.status === 'fulfilled' ? fundResult.value?.data?.klines ?? [] : []
-  const minuteKlines: string[] = minuteFundResult.status === 'fulfilled' ? minuteFundResult.value?.data?.klines ?? [] : []
   const tradeRows: string[] = tradesResult.status === 'fulfilled' ? tradesResult.value?.data?.details ?? [] : []
   const klineRows: string[] = klineResult.status === 'fulfilled' ? klineResult.value?.data?.klines ?? [] : []
   const trades = tradeRows.map(v => { const [time, price, volume, , side] = v.split(','); return { time, price: Number(price), volume: Number(volume), side: Number(side) as TradePrint['side'] } }).filter(v => Number.isFinite(v.price) && Number.isFinite(v.volume))
-  const minuteCapital = minuteKlines.map(v => { const [time, value] = v.split(','); return { time, value: Number(value) } }).filter(v => Number.isFinite(v.value))
+  const intraday = buildIntraday(trends, item.market)
+  const flow5m = estimateRecentMainFlow(trades, item.market, 5); const flow10m = estimateRecentMainFlow(trades, item.market, 10)
+  const minuteCapital = buildEstimatedCapitalTrend(trades, item.market)
   return {
-    price: trends.map(v => { const [time, price] = v.split(','); return { time, value: Number(price) } }).filter(v => Number.isFinite(v.value)),
-    averagePrice: trends.map(v => { const [time, , average] = v.split(','); return { time, value: Number(average) } }).filter(v => Number.isFinite(v.value)),
+    intraday,
+    price: intraday.map(point => ({ time: point.time, value: point.close })),
+    averagePrice: intraday.map(point => ({ time: point.time, value: point.average })),
     capital: klines.map(v => { const [time, value] = v.split(','); return { time, value: Number(value) } }).filter(v => Number.isFinite(v.value)),
     minuteCapital,
-    flow5m: recentNetFlow(minuteCapital, 5),
-    flow10m: recentNetFlow(minuteCapital, 10),
+    flow5m: flow5m.value,
+    flow10m: flow10m.value,
+    flow5mTradeCount: flow5m.tradeCount,
+    flow10mTradeCount: flow10m.tradeCount,
+    flowCoverageMinutes: flow10m.coverageMinutes,
     klines: klineRows.map(v => { const [date, open, close, high, low, volume, amount] = v.split(','); return { date, open: Number(open), close: Number(close), high: Number(high), low: Number(low), volume: Number(volume), amount: Number(amount) } }).filter(v => Number.isFinite(v.close)),
     splitSignals: detectSplitSignals(trades, item.market),
     splitEstimate: estimateSplitFlow(trades, item.market),
     updatedAt: new Date().toISOString()
   }
+}
+
+export function buildIntraday(rows: string[], market: Market) {
+  const factor = market === 'HK' ? 1 : 100; let cumulativeAmount = 0; let cumulativeShares = 0
+  return rows.map(row => {
+    const [time, open, close, high, low, volume, amount] = row.split(','); const volumeNumber = Number(volume); const amountNumber = Number(amount)
+    cumulativeAmount += Number.isFinite(amountNumber) ? amountNumber : 0; cumulativeShares += Number.isFinite(volumeNumber) ? volumeNumber * factor : 0
+    return { time, open: Number(open), close: Number(close), high: Number(high), low: Number(low), volume: volumeNumber, amount: amountNumber, average: cumulativeShares ? cumulativeAmount / cumulativeShares : Number(close) }
+  }).filter(point => Number.isFinite(point.open) && Number.isFinite(point.close) && Number.isFinite(point.high) && Number.isFinite(point.low) && Number.isFinite(point.volume) && Number.isFinite(point.amount) && Number.isFinite(point.average))
+}
+
+const tradeSeconds = (time: string) => { const [hour, minute, second] = time.split(':').map(Number); return hour * 3600 + minute * 60 + second }
+export function estimateRecentMainFlow(trades: TradePrint[], market: Market, minutes: number) {
+  const factor = market === 'HK' ? 1 : 100
+  const usable = trades.filter(trade => trade.side === 1 || trade.side === 2).map(trade => ({ ...trade, at: tradeSeconds(trade.time), amount: trade.price * trade.volume * factor })).sort((a, b) => a.at - b.at)
+  if (!usable.length) return { value: null, tradeCount: 0, coverageMinutes: 0 }
+  const latest = usable.at(-1)!.at; const threshold = 200_000; const window = usable.filter(trade => trade.at >= latest - minutes * 60 && trade.amount >= threshold)
+  const value = window.reduce((sum, trade) => sum + (trade.side === 2 ? trade.amount : -trade.amount), 0)
+  return { value, tradeCount: window.length, coverageMinutes: Math.min(minutes, Math.max(0, (latest - usable[0].at) / 60)) }
+}
+
+export function buildEstimatedCapitalTrend(trades: TradePrint[], market: Market): TrendPoint[] {
+  const factor = market === 'HK' ? 1 : 100; let cumulative = 0
+  return trades.filter(trade => trade.side === 1 || trade.side === 2).map(trade => ({ trade, amount: trade.price * trade.volume * factor })).filter(item => item.amount >= 200_000).map(({ trade, amount }) => { cumulative += trade.side === 2 ? amount : -amount; return { time: trade.time, value: cumulative } })
 }
 
 export function recentNetFlow(points: TrendPoint[], minutes: number): number | null {

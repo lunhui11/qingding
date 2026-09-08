@@ -9,4 +9,5 @@ import './decoy-v2.css'
 import './candlestick.css'
 import './hot-rank.css'
 import './watch-optimizer.css'
+import './intraday.css'
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>)

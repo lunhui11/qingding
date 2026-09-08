@@ -16,6 +16,8 @@
 .flow-window-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 5px 0 9px; }
 .flow-window-grid div { background: #151e24; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
 .flow-window-grid span { font-size: 9px; color: #63717b; }.flow-window-grid b { font-size: 11px; font-variant-numeric: tabular-nums; }
+.flow-window-grid small { color: #52616a; font-size: 7px; }.flow-window-grid .average-value { color: #e1b847; }
+.flow-method-note { margin: -4px 0 8px; color: #53616a; font-size: 8px; line-height: 1.45; }
 .position-card { margin: 8px 0; padding: 8px; border: 1px solid #2b373f; border-radius: 7px; background: #12191e; }
 .position-card header { display: flex; justify-content: space-between; align-items: center; color: #81909a; font-size: 10px; }
 .position-card header button { border: 0; background: none; color: #6e7d86; cursor: pointer; font-size: 9px; }

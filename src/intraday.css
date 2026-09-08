@@ -1,0 +1,12 @@
+.intraday-widget { margin-top: 5px; }
+.intraday-legend { display: flex; align-items: center; gap: 9px; margin-bottom: 2px; color: #77858e; font-size: 8px; }
+.intraday-legend b { color: #dbe4e9; font-size: 10px; }.intraday-legend .average-legend b { color: #e1b847; }
+.intraday-legend small { margin-left: auto; color: #56636c; font-size: 7px; }
+.intraday-chart { width: 100%; height: 151px; display: block; overflow: visible; }
+.intraday-chart .grid-line { stroke: #222c33; stroke-width: 1; }.intraday-chart .previous-line { stroke: #495761; stroke-width: 1; stroke-dasharray: 3 3; }
+.intraday-chart .price-path,.intraday-chart .average-path { fill: none; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.intraday-chart .price-path { stroke: #51a9e3; }.intraday-chart .average-path { stroke: #e1b847; }
+.intraday-chart .volume-up { fill: var(--rise); opacity: .48; }.intraday-chart .volume-down { fill: var(--fall); opacity: .48; }
+.intraday-chart .axis-label,.intraday-chart .time-label { fill: #66737c; font-size: 7px; }
+.intraday-empty { height: 150px; display: grid; place-items: center; background: repeating-linear-gradient(0deg,transparent,transparent 23px,#202930 24px); color: #58656e; font-size: 10px; }
+.app-shell[data-theme="light"] .intraday-legend b { color: #34434a; }.app-shell[data-theme="light"] .intraday-chart .grid-line { stroke: #e3e9ec; }.app-shell[data-theme="light"] .intraday-chart .previous-line { stroke: #aab6bc; }.app-shell[data-theme="light"] .intraday-chart .axis-label,.app-shell[data-theme="light"] .intraday-chart .time-label { fill: #74838a; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectSplitSignals, labelSectorLeaders, marketFromId, parseDirectCode, parseTencentQuotes, recentNetFlow, toSecid } from './market'
+import { buildIntraday, detectSplitSignals, estimateRecentMainFlow, labelSectorLeaders, marketFromId, parseDirectCode, parseTencentQuotes, recentNetFlow, toSecid } from './market'
 import type { Quote } from './types'
 
 describe('market identifiers', () => {
@@ -52,5 +52,18 @@ describe('minute capital windows', () => {
     expect(recentNetFlow(points, 5)).toBe(5_000_000)
     expect(recentNetFlow(points, 10)).toBe(10_000_000)
     expect(recentNetFlow(points.slice(0, 5), 5)).toBeNull()
+  })
+})
+
+describe('locally calculated intraday data', () => {
+  it('uses minute close for price and cumulative amount divided by shares for average', () => {
+    const points = buildIntraday(['2026-09-08 09:30,10,10,10,10,100,100000,999', '2026-09-08 09:31,10,12,12,10,100,120000,999'], 'SH')
+    expect(points.map(point => point.close)).toEqual([10, 12])
+    expect(points.map(point => point.average)).toEqual([10, 11])
+  })
+  it('calculates 5 and 10 minute active large-order net flow from raw prints', () => {
+    const trades = [{ time: '09:59:00', price: 10, volume: 300, side: 2 as const }, { time: '10:00:00', price: 10, volume: 250, side: 1 as const }, { time: '10:06:00', price: 10, volume: 400, side: 2 as const }]
+    expect(estimateRecentMainFlow(trades, 'SH', 5)).toMatchObject({ value: 400000, tradeCount: 1 })
+    expect(estimateRecentMainFlow(trades, 'SH', 10)).toMatchObject({ value: 450000, tradeCount: 3 })
   })
 })
