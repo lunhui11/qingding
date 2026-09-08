@@ -65,5 +65,6 @@ describe('locally calculated intraday data', () => {
     const trades = [{ time: '09:59:00', price: 10, volume: 300, side: 2 as const }, { time: '10:00:00', price: 10, volume: 250, side: 1 as const }, { time: '10:06:00', price: 10, volume: 400, side: 2 as const }]
     expect(estimateRecentMainFlow(trades, 'SH', 5)).toMatchObject({ value: 400000, tradeCount: 1 })
     expect(estimateRecentMainFlow(trades, 'SH', 10)).toMatchObject({ value: 450000, tradeCount: 3 })
+    expect(estimateRecentMainFlow(trades, 'SH', 10, 350000)).toMatchObject({ value: 400000, tradeCount: 1 })
   })
 })

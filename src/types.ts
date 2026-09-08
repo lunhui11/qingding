@@ -3,7 +3,7 @@ export interface WatchItem { market: Market; code: string; name: string; hidden?
 export interface TrendPoint { time: string; value: number }
 export interface IntradayPoint { time: string; open: number; close: number; high: number; low: number; volume: number; amount: number; average: number }
 export interface SplitSignal { side: 'buy' | 'sell'; startTime: string; endTime: string; tradeCount: number; totalAmount: number; confidence: number }
-export interface SplitEstimate { buyAmount: number; sellAmount: number; netAmount: number; signals: SplitSignal[]; updatedAt: string }
+export interface SplitEstimate { buyAmount: number; sellAmount: number; netAmount: number; signals: SplitSignal[]; sampleCount: number; coverageMinutes: number; confidence: number; updatedAt: string }
 export interface KlinePoint { date: string; open: number; close: number; high: number; low: number; volume: number; amount: number }
 export interface Quote {
   market: Market; code: string; name: string; price: number | null; previousClose: number | null;
@@ -24,15 +24,15 @@ export interface Settings {
   refreshMs: number; idleRefreshMs: number; opacity: number; theme: 'dark' | 'light'; colorMode: 'cn' | 'global'; tickerShortcut: string; notesShortcut: string; hideShortcut: string;
   notifications: boolean; smartAlerts: boolean; launchAtLogin: boolean; locked: boolean; paused: boolean;
   commissionRate: number; minimumCommission: number; stampDutyRate: number;
-  compactMode: boolean; positionsFirst: boolean; watchSortMode: WatchSortMode;
+  compactMode: boolean; positionsFirst: boolean; watchSortMode: WatchSortMode; largeOrderThreshold: number;
 }
 export interface AppState { watchlist: WatchItem[]; alerts: PriceAlert[]; todos: string; todoItems: TodoItem[]; todoLogs: TodoLog[]; settings: Settings; windowBounds?: { x: number; y: number; width: number; height: number } }
 export interface SearchResult { market: Market; code: string; name: string }
 
 export interface MarketFloatAPI {
   loadState(): Promise<AppState>; saveState(patch: Partial<AppState>): Promise<AppState>;
-  fetchQuotes(items: WatchItem[]): Promise<Quote[]>; fetchDetail(item: WatchItem): Promise<DetailData>;
-  fetchSplitEstimate(item: WatchItem): Promise<SplitEstimate>; fetchHotRank(): Promise<HotRankItem[]>; fetchSectorRank(): Promise<SectorRankItem[]>; fetchSectorStocks(sector: SectorRankItem): Promise<SectorStockItem[]>;
+  fetchQuotes(items: WatchItem[]): Promise<Quote[]>; fetchDetail(item: WatchItem, scope?: 'full' | 'live' | 'history', largeOrderThreshold?: number): Promise<DetailData>;
+  fetchSplitEstimate(item: WatchItem, largeOrderThreshold?: number): Promise<SplitEstimate>; fetchHotRank(): Promise<HotRankItem[]>; fetchSectorRank(): Promise<SectorRankItem[]>; fetchSectorStocks(sector: SectorRankItem): Promise<SectorStockItem[]>;
   searchStocks(query: string): Promise<SearchResult[]>; toggleDecoy(): Promise<boolean>; setDecoy(value: boolean): Promise<boolean>;
   setWindowOpacity(value: number): Promise<void>; setWindowLocked(value: boolean): Promise<void>;
   updateShortcut(tickerValue: string, notesValue: string, hideValue: string): Promise<{ ok: boolean; error?: string }>; setLaunchAtLogin(value: boolean): Promise<void>;

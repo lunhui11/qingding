@@ -63,21 +63,28 @@ export async function fetchQuotes(items: WatchItem[]): Promise<Quote[]> {
   })
 }
 
-export async function fetchDetail(item: WatchItem): Promise<DetailData> {
+export async function fetchDetail(item: WatchItem, scope: 'full' | 'live' | 'history' = 'full', largeOrderThreshold = 200_000): Promise<DetailData> {
   const secid = toSecid(item)
   const priceUrl = `https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11&fields2=f51,f52,f53,f54,f55,f56,f57,f58&ndays=1&iscr=0`
   const fundUrl = `https://push2his.eastmoney.com/api/qt/stock/fflow/kline/get?secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55&lmt=20&klt=101`
   const klineUrl = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&lmt=30&end=20500101`
   const tradesUrl = `https://push2.eastmoney.com/api/qt/stock/details/get?secid=${secid}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&pos=-500`
-  const [priceResult, fundResult, klineResult, tradesResult] = await Promise.allSettled([getJson(priceUrl), item.market === 'HK' ? Promise.resolve(null) : getJson(fundUrl), getJson(klineUrl), getJson(tradesUrl)])
+  const loadLive = scope !== 'history'; const loadHistory = scope !== 'live'
+  const [priceResult, fundResult, klineResult, tradesResult] = await Promise.allSettled([
+    loadLive ? getJson(priceUrl) : Promise.resolve(null),
+    loadHistory && item.market !== 'HK' ? getJson(fundUrl) : Promise.resolve(null),
+    loadHistory ? getJson(klineUrl) : Promise.resolve(null),
+    loadLive ? getJson(tradesUrl) : Promise.resolve(null)
+  ])
   const trends: string[] = priceResult.status === 'fulfilled' ? priceResult.value?.data?.trends ?? [] : []
   const klines: string[] = fundResult.status === 'fulfilled' ? fundResult.value?.data?.klines ?? [] : []
   const tradeRows: string[] = tradesResult.status === 'fulfilled' ? tradesResult.value?.data?.details ?? [] : []
   const klineRows: string[] = klineResult.status === 'fulfilled' ? klineResult.value?.data?.klines ?? [] : []
   const trades = tradeRows.map(v => { const [time, price, volume, , side] = v.split(','); return { time, price: Number(price), volume: Number(volume), side: Number(side) as TradePrint['side'] } }).filter(v => Number.isFinite(v.price) && Number.isFinite(v.volume))
   const intraday = buildIntraday(trends, item.market)
-  const flow5m = estimateRecentMainFlow(trades, item.market, 5); const flow10m = estimateRecentMainFlow(trades, item.market, 10)
-  const minuteCapital = buildEstimatedCapitalTrend(trades, item.market)
+  const threshold = Math.max(10_000, Math.min(100_000_000, Number(largeOrderThreshold) || 200_000))
+  const flow5m = estimateRecentMainFlow(trades, item.market, 5, threshold); const flow10m = estimateRecentMainFlow(trades, item.market, 10, threshold)
+  const minuteCapital = buildEstimatedCapitalTrend(trades, item.market, threshold)
   return {
     intraday,
     price: intraday.map(point => ({ time: point.time, value: point.close })),
@@ -91,7 +98,7 @@ export async function fetchDetail(item: WatchItem): Promise<DetailData> {
     flowCoverageMinutes: flow10m.coverageMinutes,
     klines: klineRows.map(v => { const [date, open, close, high, low, volume, amount] = v.split(','); return { date, open: Number(open), close: Number(close), high: Number(high), low: Number(low), volume: Number(volume), amount: Number(amount) } }).filter(v => Number.isFinite(v.close)),
     splitSignals: detectSplitSignals(trades, item.market),
-    splitEstimate: estimateSplitFlow(trades, item.market),
+    splitEstimate: estimateSplitFlow(trades, item.market, threshold),
     updatedAt: new Date().toISOString()
   }
 }
@@ -106,18 +113,18 @@ export function buildIntraday(rows: string[], market: Market) {
 }
 
 const tradeSeconds = (time: string) => { const [hour, minute, second] = time.split(':').map(Number); return hour * 3600 + minute * 60 + second }
-export function estimateRecentMainFlow(trades: TradePrint[], market: Market, minutes: number) {
+export function estimateRecentMainFlow(trades: TradePrint[], market: Market, minutes: number, largeOrderThreshold = 200_000) {
   const factor = market === 'HK' ? 1 : 100
   const usable = trades.filter(trade => trade.side === 1 || trade.side === 2).map(trade => ({ ...trade, at: tradeSeconds(trade.time), amount: trade.price * trade.volume * factor })).sort((a, b) => a.at - b.at)
   if (!usable.length) return { value: null, tradeCount: 0, coverageMinutes: 0 }
-  const latest = usable.at(-1)!.at; const threshold = 200_000; const window = usable.filter(trade => trade.at >= latest - minutes * 60 && trade.amount >= threshold)
+  const latest = usable.at(-1)!.at; const window = usable.filter(trade => trade.at >= latest - minutes * 60 && trade.amount >= largeOrderThreshold)
   const value = window.reduce((sum, trade) => sum + (trade.side === 2 ? trade.amount : -trade.amount), 0)
   return { value, tradeCount: window.length, coverageMinutes: Math.min(minutes, Math.max(0, (latest - usable[0].at) / 60)) }
 }
 
-export function buildEstimatedCapitalTrend(trades: TradePrint[], market: Market): TrendPoint[] {
+export function buildEstimatedCapitalTrend(trades: TradePrint[], market: Market, largeOrderThreshold = 200_000): TrendPoint[] {
   const factor = market === 'HK' ? 1 : 100; let cumulative = 0
-  return trades.filter(trade => trade.side === 1 || trade.side === 2).map(trade => ({ trade, amount: trade.price * trade.volume * factor })).filter(item => item.amount >= 200_000).map(({ trade, amount }) => { cumulative += trade.side === 2 ? amount : -amount; return { time: trade.time, value: cumulative } })
+  return trades.filter(trade => trade.side === 1 || trade.side === 2).map(trade => ({ trade, amount: trade.price * trade.volume * factor })).filter(item => item.amount >= largeOrderThreshold).map(({ trade, amount }) => { cumulative += trade.side === 2 ? amount : -amount; return { time: trade.time, value: cumulative } })
 }
 
 export function recentNetFlow(points: TrendPoint[], minutes: number): number | null {
@@ -125,11 +132,11 @@ export function recentNetFlow(points: TrendPoint[], minutes: number): number | n
   return points.at(-1)!.value - points[points.length - 1 - minutes].value
 }
 
-export async function fetchSplitEstimate(item: WatchItem): Promise<SplitEstimate> {
+export async function fetchSplitEstimate(item: WatchItem, largeOrderThreshold = 200_000): Promise<SplitEstimate> {
   const url = `https://push2.eastmoney.com/api/qt/stock/details/get?secid=${toSecid(item)}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&pos=-160`
   const json = await getJson(url); const rows: string[] = json?.data?.details ?? []
   const trades = rows.map(v => { const [time, price, volume, , side] = v.split(','); return { time, price: Number(price), volume: Number(volume), side: Number(side) as TradePrint['side'] } }).filter(v => Number.isFinite(v.price) && Number.isFinite(v.volume))
-  return estimateSplitFlow(trades, item.market)
+  return estimateSplitFlow(trades, item.market, largeOrderThreshold)
 }
 
 const seconds = (time: string) => { const [h, m, s] = time.split(':').map(Number); return h * 3600 + m * 60 + s }
@@ -150,11 +157,14 @@ export function detectSplitSignals(trades: TradePrint[], market: Market): SplitS
   return [...latest.values()].sort((a, b) => b.confidence - a.confidence)
 }
 
-export function estimateSplitFlow(trades: TradePrint[], market: Market): SplitEstimate {
+export function estimateSplitFlow(trades: TradePrint[], market: Market, _largeOrderThreshold = 200_000): SplitEstimate {
   const signals = detectSplitSignals(trades, market)
   const buyAmount = signals.filter(v => v.side === 'buy').reduce((sum, v) => sum + v.totalAmount, 0)
   const sellAmount = signals.filter(v => v.side === 'sell').reduce((sum, v) => sum + v.totalAmount, 0)
-  return { buyAmount, sellAmount, netAmount: buyAmount - sellAmount, signals, updatedAt: new Date().toISOString() }
+  const timed = trades.map(trade => tradeSeconds(trade.time)).filter(Number.isFinite).sort((a, b) => a - b)
+  const coverageMinutes = timed.length > 1 ? Math.max(0, (timed.at(-1)! - timed[0]) / 60) : 0
+  const confidence = signals.length ? Math.max(...signals.map(signal => signal.confidence)) : Math.min(45, Math.round(trades.length / 4))
+  return { buyAmount, sellAmount, netAmount: buyAmount - sellAmount, signals, sampleCount: trades.length, coverageMinutes, confidence, updatedAt: new Date().toISOString() }
 }
 
 export async function fetchHotRank(): Promise<HotRankItem[]> {

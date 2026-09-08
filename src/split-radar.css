@@ -2,6 +2,9 @@
 .split-radar header { display: flex; justify-content: space-between; color: #a8b3ba; font-size: 10px; margin-bottom: 6px; }
 .split-radar header small { color: #5f6d77; }
 .split-radar p { margin: 8px 0 2px; color: #5e6b75; font-size: 10px; text-align: center; }
+.split-coverage { display: flex; gap: 6px; flex-wrap: wrap; margin: -1px 0 6px; color: #71808a; font-size: 8px; }
+.split-coverage span { padding-right: 6px; border-right: 1px solid #2d3941; }
+.split-coverage span:last-child { border-right: 0; }
 .split-signal { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 4px 0; font-size: 10px; }
 .split-signal b { font-weight: 600; }
 .split-signal span { text-align: right; }

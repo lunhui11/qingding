@@ -14,7 +14,7 @@ describe('alerts', () => {
 })
 
 describe('smart signals', () => {
-  const split = { buyAmount: 4e6, sellAmount: 2e6, netAmount: 2e6, signals: [], updatedAt: '' }
+  const split = { buyAmount: 4e6, sellAmount: 2e6, netAmount: 2e6, signals: [], sampleCount: 160, coverageMinutes: 8, confidence: 72, updatedAt: '' }
   it('requires volume, price and both capital directions to agree', () => {
     expect(smartSignal({ ...quote, changePercent: 1, mainNetInflow: 5e6, volumeRatio: 2 }, split)).toBe('inflow')
     expect(smartSignal({ ...quote, changePercent: -1, mainNetInflow: -5e6, volumeRatio: 2 }, { ...split, netAmount: -2e6 })).toBe('outflow')

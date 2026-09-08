@@ -11,6 +11,7 @@ function movingAverage(points: KlinePoint[], period: Period) {
 export default function Candlestick({ points, costPrice }: { points: KlinePoint[]; costPrice?: number }) {
   const [collapsed, setCollapsed] = useState(false)
   const [visible, setVisible] = useState<Record<Period, boolean>>({ 5: true, 10: true, 30: true })
+  const [hovered, setHovered] = useState<number | null>(null)
   const averages = useMemo(() => Object.fromEntries(periods.map(period => [period, movingAverage(points, period)])) as Record<Period, ReturnType<typeof movingAverage>>, [points])
   const latest = (period: Period) => averages[period].at(-1)?.value ?? null
   if (!points.length) return <div className="spark-empty">K 线暂时不可用</div>
@@ -28,10 +29,12 @@ export default function Candlestick({ points, costPrice }: { points: KlinePoint[
       {!!costValues.length && <span className="cost-legend">成本 {costPrice!.toFixed(costPrice! < 10 ? 3 : 2)}</span>}
       <button className="chart-toggle" onClick={() => setCollapsed(value => !value)}>{collapsed ? '展开图表' : '收起图表'}</button>
     </div>
-    {!collapsed && <svg className="candlestick" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-label="30日K线与均线">
+    {!collapsed && hovered != null && <div className="kline-inspector"><b>{points[hovered].date}</b><span>开 {points[hovered].open}</span><span>高 {points[hovered].high}</span><span>低 {points[hovered].low}</span><span>收 {points[hovered].close}</span></div>}
+    {!collapsed && <svg className="candlestick" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-label="30日K线与均线" onMouseMove={event => { const box = event.currentTarget.getBoundingClientRect(); setHovered(Math.max(0, Math.min(points.length - 1, Math.floor((event.clientX - box.left) / box.width * points.length)))) }} onMouseLeave={() => setHovered(null)}>
       {points.map((p, i) => { const x = i * slot + slot / 2; const up = p.close >= p.open; const top = y(Math.max(p.open, p.close)); const bodyHeight = Math.max(1.2, Math.abs(y(p.open) - y(p.close))); return <g className={up ? 'candle-up' : 'candle-down'} key={p.date}><line x1={x} x2={x} y1={y(p.high)} y2={y(p.low)}/><rect x={x - Math.max(1.5, slot * .26)} y={top} width={Math.max(3, slot * .52)} height={bodyHeight}/></g> })}
       {periods.map(period => visible[period] && <polyline key={period} className={`ma-line ma${period}`} points={linePoints(period)}/>)}
       {!!costValues.length && <line className="cost-line" x1="0" x2={width} y1={y(costPrice!)} y2={y(costPrice!)}/>}
+      {hovered != null && <line className="kline-crosshair" x1={hovered * slot + slot / 2} x2={hovered * slot + slot / 2} y1="0" y2={height}/>} 
     </svg>}
   </div>
 }

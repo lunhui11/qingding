@@ -9,8 +9,8 @@ import SettingsPanel from './components/SettingsPanel'
 import Candlestick from './components/Candlestick'
 import IntradayChart from './components/IntradayChart'
 
-const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05, compactMode: false, positionsFirst: true, watchSortMode: 'manual' } }
-const mergeDetail = (loaded: DetailData, previous?: DetailData): DetailData => ({ ...loaded, intraday: loaded.intraday.length ? loaded.intraday : previous?.intraday ?? [], price: loaded.price.length ? loaded.price : previous?.price ?? [], averagePrice: loaded.averagePrice.length ? loaded.averagePrice : previous?.averagePrice ?? [], minuteCapital: loaded.minuteCapital.length ? loaded.minuteCapital : previous?.minuteCapital ?? [], flow5m: loaded.flow5m ?? previous?.flow5m ?? null, flow10m: loaded.flow10m ?? previous?.flow10m ?? null, klines: loaded.klines.length ? loaded.klines : previous?.klines ?? [], capital: loaded.capital.length ? loaded.capital : previous?.capital ?? [] })
+const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05, compactMode: false, positionsFirst: true, watchSortMode: 'manual', largeOrderThreshold: 200000 } }
+const mergeDetail = (loaded: DetailData, previous?: DetailData): DetailData => ({ ...loaded, intraday: loaded.intraday.length ? loaded.intraday : previous?.intraday ?? [], price: loaded.price.length ? loaded.price : previous?.price ?? [], averagePrice: loaded.averagePrice.length ? loaded.averagePrice : previous?.averagePrice ?? [], minuteCapital: loaded.minuteCapital.length ? loaded.minuteCapital : previous?.minuteCapital ?? [], flow5m: loaded.flow5m ?? previous?.flow5m ?? null, flow10m: loaded.flow10m ?? previous?.flow10m ?? null, flow5mTradeCount: loaded.flow5m == null ? previous?.flow5mTradeCount ?? 0 : loaded.flow5mTradeCount, flow10mTradeCount: loaded.flow10m == null ? previous?.flow10mTradeCount ?? 0 : loaded.flow10mTradeCount, flowCoverageMinutes: loaded.flow10m == null ? previous?.flowCoverageMinutes ?? 0 : loaded.flowCoverageMinutes, klines: loaded.klines.length ? loaded.klines : previous?.klines ?? [], capital: loaded.capital.length ? loaded.capital : previous?.capital ?? [], splitSignals: loaded.splitEstimate.sampleCount ? loaded.splitSignals : previous?.splitSignals ?? [], splitEstimate: loaded.splitEstimate.sampleCount ? loaded.splitEstimate : previous?.splitEstimate ?? loaded.splitEstimate })
 const exactMoney = (value: number) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(value))}`
 
 export default function App() {
@@ -38,7 +38,6 @@ export default function App() {
   const quotesRef = useRef<Record<string, Quote>>({})
   const smartAlertTimes = useRef<Record<string, number>>({})
   const previousTriggers = useRef<Record<string, boolean>>({})
-  const prefetched = useRef(new Set<string>())
 
   useEffect(() => { window.marketFloat.loadState().then(setState); return window.marketFloat.onDecoyChanged(value => { setDecoy(value); window.marketFloat.loadState().then(setState) }) }, [])
   const save = useCallback(async (patch: Partial<AppState>) => setState(await window.marketFloat.saveState(patch)), [])
@@ -77,30 +76,21 @@ export default function App() {
   }, [refresh, decoy, state.settings.refreshMs, state.settings.idleRefreshMs])
 
   useEffect(() => {
-    if (!expanded || decoy) return
+    if (!expanded || decoy || state.settings.paused) return
     const item = state.watchlist.find(v => secid(v) === expanded); if (!item) return
-    const load = async () => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => ({ ...old, [expanded]: mergeDetail(loaded, old[expanded]) })); setSplits(old => ({ ...old, [expanded]: loaded.splitEstimate })) } finally { detailBusy.current = false } }
-    load(); const timer = window.setInterval(load, Math.max(1000, state.settings.refreshMs)); return () => clearInterval(timer)
-  }, [expanded, decoy, state.watchlist, state.settings.refreshMs])
-
-  useEffect(() => {
-    if (decoy || state.settings.paused) return
     let cancelled = false
-    const timer = window.setTimeout(async () => {
-      for (const item of state.watchlist.filter(v => !v.hidden).slice(0, 5)) {
-        const id = secid(item); if (cancelled || prefetched.current.has(id) || id === expanded) continue
-        prefetched.current.add(id)
-        try { const loaded = await window.marketFloat.fetchDetail(item); if (!cancelled) { setDetails(old => ({ ...old, [id]: mergeDetail(loaded, old[id]) })); setSplits(old => ({ ...old, [id]: loaded.splitEstimate })) } } catch { prefetched.current.delete(id) }
-      }
-    }, 1200)
-    return () => { cancelled = true; clearTimeout(timer) }
-  }, [decoy, expanded, state.settings.paused, state.watchlist])
+    const load = async (scope: 'full' | 'live' | 'history') => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item, scope, state.settings.largeOrderThreshold); if (!cancelled) { setDetails(old => ({ ...old, [expanded]: mergeDetail(loaded, old[expanded]) })); if (loaded.splitEstimate.sampleCount) setSplits(old => ({ ...old, [expanded]: loaded.splitEstimate })) } } finally { detailBusy.current = false } }
+    load('full')
+    const liveTimer = window.setInterval(() => load('live'), 3000)
+    const historyTimer = window.setInterval(() => load('history'), 300_000)
+    return () => { cancelled = true; clearInterval(liveTimer); clearInterval(historyTimer) }
+  }, [expanded, decoy, state.settings.paused, state.settings.largeOrderThreshold, state.watchlist])
 
   useEffect(() => {
     if (decoy || state.settings.paused) return
-    const loadNext = async () => { const visible = state.watchlist.filter(v => !v.hidden).slice(0, 12); if (!visible.length || splitBusy.current) return; const item = visible[splitCursor.current++ % visible.length]; const id = secid(item); splitBusy.current = true; try { const estimate = await window.marketFloat.fetchSplitEstimate(item); setSplits(old => ({ ...old, [id]: estimate })); const signal = smartSignal(quotesRef.current[id], estimate); const now = Date.now(); if (signal && state.settings.notifications && state.settings.smartAlerts && now - (smartAlertTimes.current[id] ?? 0) > 900_000) { const q = quotesRef.current[id]; window.marketFloat.notify(`${q?.name || item.name} · 资金${signal === 'inflow' ? '流入' : '流出'}共振`, `量比 ${q?.volumeRatio?.toFixed(2)}，明盘与拆单估算同向${signal === 'inflow' ? '流入' : '流出'}`); smartAlertTimes.current[id] = now } } catch { /* retain the last valid estimate */ } finally { splitBusy.current = false } }
-    loadNext(); const timer = window.setInterval(loadNext, 1000); return () => clearInterval(timer)
-  }, [decoy, state.settings.paused, state.settings.notifications, state.settings.smartAlerts, state.watchlist])
+    const loadNext = async () => { const visible = state.watchlist.filter(v => !v.hidden).slice(0, 12); if (!visible.length || splitBusy.current) return; const item = visible[splitCursor.current++ % visible.length]; const id = secid(item); splitBusy.current = true; try { const estimate = await window.marketFloat.fetchSplitEstimate(item, state.settings.largeOrderThreshold); setSplits(old => ({ ...old, [id]: estimate })); const signal = smartSignal(quotesRef.current[id], estimate); const now = Date.now(); if (signal && state.settings.notifications && state.settings.smartAlerts && now - (smartAlertTimes.current[id] ?? 0) > 900_000) { const q = quotesRef.current[id]; window.marketFloat.notify(`${q?.name || item.name} · 资金${signal === 'inflow' ? '流入' : '流出'}共振`, `量比 ${q?.volumeRatio?.toFixed(2)}，明盘与拆单估算同向${signal === 'inflow' ? '流入' : '流出'}`); smartAlertTimes.current[id] = now } } catch { /* retain the last valid estimate */ } finally { splitBusy.current = false } }
+    loadNext(); const timer = window.setInterval(loadNext, 3000); return () => clearInterval(timer)
+  }, [decoy, state.settings.paused, state.settings.notifications, state.settings.smartAlerts, state.settings.largeOrderThreshold, state.watchlist])
 
   useEffect(() => { if (hotOpen) window.marketFloat.fetchHotRank().then(setHotRanks).catch(() => setHotRanks([])) }, [hotOpen])
   useEffect(() => { if (sectorOpen) window.marketFloat.fetchSectorRank().then(setSectorRanks).catch(() => setSectorRanks([])) }, [sectorOpen])
@@ -178,12 +168,12 @@ export default function App() {
             <div className="chart-block intraday-block"><header><span>当日完整分时成交</span><span>{detail?.intraday.at(-1)?.time?.slice(-5) ?? '加载中'}</span></header><IntradayChart points={detail?.intraday ?? []} previousClose={q?.previousClose ?? null} market={item.market}/></div>
             <div className="metric-grid"><div><span>成交额</span><b>{fmtMoney(q?.amount ?? null).replace('+','')}</b></div><div><span>量比</span><b>{q?.volumeRatio == null ? '—' : q.volumeRatio.toFixed(2)}</b></div><div><span>实际换手率</span><b>{q?.actualTurnoverRate == null ? '—' : `${q.actualTurnoverRate.toFixed(2)}%`}</b></div></div>
             <div className="flow-window-grid"><div><span>当日成交均价</span><b className="average-value">{fmtPrice(detail?.averagePrice.at(-1)?.value ?? null)}</b><small>累计成交计算</small></div><div><span>近 5 分钟主力</span><b className={directionClass(detail?.flow5m ?? null, state.settings)}>{fmtMoney(detail?.flow5m ?? null)}</b><small>{detail ? `${detail.flow5mTradeCount} 笔主动大单` : '计算中'}</small></div><div><span>近 10 分钟主力</span><b className={directionClass(detail?.flow10m ?? null, state.settings)}>{fmtMoney(detail?.flow10m ?? null)}</b><small>{detail ? `${detail.flow10mTradeCount} 笔主动大单` : '计算中'}</small></div></div>
-            <p className="flow-method-note">软件按最近逐笔成交自行计算：单笔成交额 ≥ 20 万，主动买入为正、主动卖出为负；当前样本覆盖约 {detail?.flowCoverageMinutes.toFixed(1) ?? '—'} 分钟。</p>
+            <p className="flow-method-note">软件按最近逐笔成交自行计算：单笔成交额 ≥ {fmtMoney(state.settings.largeOrderThreshold).replace('+','')}，主动买入为正、主动卖出为负；当前样本覆盖约 {detail?.flowCoverageMinutes.toFixed(1) ?? '—'} 分钟。</p>
             <div className="chart-block"><header><span>30 日 K 线</span><span>{detail?.klines.at(-1)?.date ?? '加载中'}</span></header><Candlestick points={detail?.klines ?? []} costPrice={item.costPrice}/></div>
             <PositionCard item={item} price={q?.price ?? null} settings={state.settings} onSave={position => save({ watchlist: state.watchlist.map(v => secid(v) === id ? { ...v, ...position } : v) })}/>
             <div className="chart-block"><header><span>近 20 日主力资金</span><span>{item.market === 'HK' ? '趋势暂无数据' : fmtMoney(q?.mainNetInflow ?? null)}</span></header><Sparkline points={detail?.capital ?? []} positive={(q?.mainNetInflow ?? 0) >= 0}/></div>
             <div className="breakdown"><span>超大单 <b className={directionClass(q?.superLargeNet ?? null, state.settings)}>{fmtMoney(q?.superLargeNet ?? null)}</b></span><span>大单 <b className={directionClass(q?.largeNet ?? null, state.settings)}>{fmtMoney(q?.largeNet ?? null)}</b></span></div>
-            <div className="split-radar"><header><span>暗盘 · 疑似拆单</span><small>算法推测 · 逐笔扫描</small></header><div className="split-summary"><span>拆单买入 <b className={directionClass(1,state.settings)}>{fmtMoney(detail?.splitEstimate.buyAmount ?? 0)}</b></span><span>拆单卖出 <b className={directionClass(-1,state.settings)}>{fmtMoney(-(detail?.splitEstimate.sellAmount ?? 0))}</b></span></div>{detail?.splitSignals?.length ? detail.splitSignals.map(signal => <div className={`split-signal ${signal.side === 'buy' ? directionClass(1, state.settings) : directionClass(-1, state.settings)}`} key={signal.side}><b>{signal.side === 'buy' ? '疑似拆单买入' : '疑似拆单卖出'}</b><span>{fmtMoney(signal.totalAmount)} · {signal.tradeCount} 笔</span><em>置信度 {signal.confidence}%</em></div>) : <p>最近逐笔成交中暂无明显拆单信号</p>}</div>
+            <div className="split-radar"><header><span>暗盘 · 疑似拆单</span><small>算法推测 · 逐笔扫描</small></header><div className="split-coverage"><span>样本 {detail?.splitEstimate.sampleCount ?? 0} 笔</span><span>覆盖 {detail?.splitEstimate.coverageMinutes.toFixed(1) ?? '—'} 分钟</span><span>最高可信度 {detail?.splitEstimate.confidence ?? 0}%</span></div><div className="split-summary"><span>拆单买入 <b className={directionClass(1,state.settings)}>{fmtMoney(detail?.splitEstimate.buyAmount ?? 0)}</b></span><span>拆单卖出 <b className={directionClass(-1,state.settings)}>{fmtMoney(-(detail?.splitEstimate.sellAmount ?? 0))}</b></span></div>{detail?.splitSignals?.length ? detail.splitSignals.map(signal => <div className={`split-signal ${signal.side === 'buy' ? directionClass(1, state.settings) : directionClass(-1, state.settings)}`} key={signal.side}><b>{signal.side === 'buy' ? '疑似拆单买入' : '疑似拆单卖出'}</b><span>{fmtMoney(signal.totalAmount)} · {signal.tradeCount} 笔</span><em>置信度 {signal.confidence}%</em></div>) : <p>当前样本未发现明显拆单；样本不足时不作推断</p>}</div>
             <div className="detail-actions"><button onClick={() => setAlertFor(id)}><Bell size={14}/>提醒</button><button onClick={() => save({ watchlist: state.watchlist.map(v => secid(v) === id ? { ...v, hidden: true } : v) })}><EyeOff size={14}/>隐藏</button><button className="danger" onClick={() => save({ watchlist: state.watchlist.filter(v => secid(v) !== id) })}><Trash2 size={14}/>删除</button></div>
           </div>}
         </article>

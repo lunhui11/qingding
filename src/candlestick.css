@@ -11,6 +11,9 @@
 .candlestick .ma-line { fill: none; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 .candlestick .ma-line.ma5 { stroke: #d8a735; }.candlestick .ma-line.ma10 { stroke: #4aa3df; }.candlestick .ma-line.ma30 { stroke: #ad79d8; }
 .candlestick .cost-line { stroke: #f3f5f6; stroke-width: 1; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; opacity: .8; }
+.candlestick .kline-crosshair { stroke: #9aa7af; stroke-width: .7; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+.kline-inspector { display: flex; align-items: center; gap: 7px; margin: -1px 0 3px; color: #829099; font-size: 7px; font-variant-numeric: tabular-nums; }
+.kline-inspector b { color: #aeb9bf; font-weight: 600; }
 .cost-legend { color: #cbd3d8; font-size: 8px; padding-left: 2px; white-space: nowrap; }
 .kline-widget.collapsed { padding-bottom: 2px; border-bottom: 1px solid #253039; }
 .flow-window-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 5px 0 9px; }

@@ -11,6 +11,8 @@ export default function SettingsPanel({ value, onChange, onClose, shortcutError 
     <label>涨跌颜色<select value={value.colorMode} onChange={e => set('colorMode', e.target.value as Settings['colorMode'])}><option value="cn">红涨绿跌</option><option value="global">绿涨红跌</option></select></label>
     <label className="toggle"><span>持仓股票优先</span><input type="checkbox" checked={value.positionsFirst} onChange={e => set('positionsFirst', e.target.checked)}/></label>
     <label className="toggle"><span>紧凑列表模式</span><input type="checkbox" checked={value.compactMode} onChange={e => set('compactMode', e.target.checked)}/></label>
+    <div className="settings-section">逐笔资金计算</div>
+    <label>大单最低金额<input type="number" min="1" max="10000" step="5" value={value.largeOrderThreshold / 10000} onChange={e => set('largeOrderThreshold', Math.max(1, Math.min(10000, Number(e.target.value) || 20)) * 10000)}/><span>万元</span></label>
     <div className="settings-section">持仓费用估算</div>
     <label>佣金费率<input type="number" min="0" step="0.1" defaultValue={value.commissionRate} onBlur={e => set('commissionRate', Math.max(0, Number(e.target.value)) || 0)}/><span>万分之</span></label>
     <label>单笔最低佣金<input type="number" min="0" step="0.01" defaultValue={value.minimumCommission} onBlur={e => set('minimumCommission', Math.max(0, Number(e.target.value)) || 0)}/><span>元</span></label>
@@ -22,6 +24,6 @@ export default function SettingsPanel({ value, onChange, onClose, shortcutError 
     <label className="toggle"><span>系统通知</span><input type="checkbox" checked={value.notifications} onChange={e => set('notifications', e.target.checked)}/></label>
     <label className="toggle"><span>资金共振提醒</span><input type="checkbox" checked={value.smartAlerts} onChange={e => set('smartAlerts', e.target.checked)}/></label>
     <label className="toggle"><span>开机启动</span><input type="checkbox" checked={value.launchAtLogin} onChange={e => set('launchAtLogin', e.target.checked)}/></label>
-    <p className="fineprint">费用按一次买入、按当前价一次卖出估算；若成本价已包含费用，可将费率设为 0。未计过户费等其他费用。资金共振要求放量、价格、明盘及拆单估算方向一致，15 分钟内不重复提醒。</p>
+    <p className="fineprint">5/10 分钟资金由软件按上述门槛分析逐笔主动买卖；疑似拆单仍为算法推测，并显示样本覆盖与可信度。费用按一次买入、按当前价一次卖出估算；若成本价已包含费用，可将费率设为 0。资金共振 15 分钟内不重复提醒。</p>
   </section></div>
 }
