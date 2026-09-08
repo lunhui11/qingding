@@ -9,6 +9,8 @@ export default function SettingsPanel({ value, onChange, onClose, shortcutError 
     <label>隐藏时刷新<input type="number" min="10" max="300" value={value.idleRefreshMs / 1000} onChange={e => set('idleRefreshMs', Math.max(10, Number(e.target.value)) * 1000)}/><span>秒</span></label>
     <label>盯盘主题<select value={value.theme} onChange={e => set('theme', e.target.value as Settings['theme'])}><option value="dark">暗色模式</option><option value="light">亮色模式</option></select></label>
     <label>涨跌颜色<select value={value.colorMode} onChange={e => set('colorMode', e.target.value as Settings['colorMode'])}><option value="cn">红涨绿跌</option><option value="global">绿涨红跌</option></select></label>
+    <label className="toggle"><span>持仓股票优先</span><input type="checkbox" checked={value.positionsFirst} onChange={e => set('positionsFirst', e.target.checked)}/></label>
+    <label className="toggle"><span>紧凑列表模式</span><input type="checkbox" checked={value.compactMode} onChange={e => set('compactMode', e.target.checked)}/></label>
     <div className="settings-section">持仓费用估算</div>
     <label>佣金费率<input type="number" min="0" step="0.1" defaultValue={value.commissionRate} onBlur={e => set('commissionRate', Math.max(0, Number(e.target.value)) || 0)}/><span>万分之</span></label>
     <label>单笔最低佣金<input type="number" min="0" step="0.01" defaultValue={value.minimumCommission} onBlur={e => set('minimumCommission', Math.max(0, Number(e.target.value)) || 0)}/><span>元</span></label>

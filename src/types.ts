@@ -15,6 +15,7 @@ export interface SectorRankItem { code: string; name: string; kind: 'industry' |
 export type SectorLeaderLabel = '涨幅龙头' | '人气龙头' | '资金龙头'
 export interface SectorStockItem extends Quote { leaderLabels: SectorLeaderLabel[]; popularityRank: number | null }
 export type AlertMetric = 'priceAbove' | 'priceBelow' | 'changeAbove' | 'changeBelow'
+export type WatchSortMode = 'manual' | 'change' | 'mainFlow' | 'flow5m' | 'flow10m' | 'volumeRatio' | 'profit'
 export interface PriceAlert { id: string; secid: string; metric: AlertMetric; threshold: number; enabled: boolean; lastTriggered?: number }
 export interface TodoItem { id: string; text: string; tag: string; completed: boolean; createdAt: string; completedAt?: string }
 export interface TodoLog { id: string; savedAt: string; items: TodoItem[] }
@@ -22,6 +23,7 @@ export interface Settings {
   refreshMs: number; idleRefreshMs: number; opacity: number; theme: 'dark' | 'light'; colorMode: 'cn' | 'global'; tickerShortcut: string; notesShortcut: string; hideShortcut: string;
   notifications: boolean; smartAlerts: boolean; launchAtLogin: boolean; locked: boolean; paused: boolean;
   commissionRate: number; minimumCommission: number; stampDutyRate: number;
+  compactMode: boolean; positionsFirst: boolean; watchSortMode: WatchSortMode;
 }
 export interface AppState { watchlist: WatchItem[]; alerts: PriceAlert[]; todos: string; todoItems: TodoItem[]; todoLogs: TodoLog[]; settings: Settings; windowBounds?: { x: number; y: number; width: number; height: number } }
 export interface SearchResult { market: Market; code: string; name: string }

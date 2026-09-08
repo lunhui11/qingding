@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, ArrowLeft, Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, LayoutGrid, Moon, Pause, Play, Plus, Search, Sun, Trash2, X } from 'lucide-react'
+import { Activity, ArrowLeft, Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, LayoutGrid, Moon, Pause, Play, Plus, Rows3, Search, Sun, Trash2, X } from 'lucide-react'
 import type { AppState, DetailData, HotRankItem, PriceAlert, Quote, SearchResult, SectorRankItem, SectorStockItem, SplitEstimate, TodoItem, TodoLog, WatchItem } from './types'
 import { alertTriggered, calculatePositionProfit, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid, smartSignal } from './utils'
 import Sparkline from './components/Sparkline'
@@ -8,13 +8,16 @@ import Decoy from './components/Decoy'
 import SettingsPanel from './components/SettingsPanel'
 import Candlestick from './components/Candlestick'
 
-const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05 } }
+const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, smartAlerts: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05, compactMode: false, positionsFirst: true, watchSortMode: 'manual' } }
+const mergeDetail = (loaded: DetailData, previous?: DetailData): DetailData => ({ ...loaded, price: loaded.price.length ? loaded.price : previous?.price ?? [], averagePrice: loaded.averagePrice.length ? loaded.averagePrice : previous?.averagePrice ?? [], minuteCapital: loaded.minuteCapital.length ? loaded.minuteCapital : previous?.minuteCapital ?? [], flow5m: loaded.flow5m ?? previous?.flow5m ?? null, flow10m: loaded.flow10m ?? previous?.flow10m ?? null, klines: loaded.klines.length ? loaded.klines : previous?.klines ?? [], capital: loaded.capital.length ? loaded.capital : previous?.capital ?? [] })
+const exactMoney = (value: number) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(value))}`
 
 export default function App() {
   const [state, setState] = useState<AppState>(fallbackState)
   const [quotes, setQuotes] = useState<Record<string, Quote>>({})
   const [details, setDetails] = useState<Record<string, DetailData>>({})
   const [expanded, setExpanded] = useState<string>()
+  const [focused, setFocused] = useState<string>()
   const [decoy, setDecoy] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -34,6 +37,7 @@ export default function App() {
   const quotesRef = useRef<Record<string, Quote>>({})
   const smartAlertTimes = useRef<Record<string, number>>({})
   const previousTriggers = useRef<Record<string, boolean>>({})
+  const prefetched = useRef(new Set<string>())
 
   useEffect(() => { window.marketFloat.loadState().then(setState); return window.marketFloat.onDecoyChanged(value => { setDecoy(value); window.marketFloat.loadState().then(setState) }) }, [])
   const save = useCallback(async (patch: Partial<AppState>) => setState(await window.marketFloat.saveState(patch)), [])
@@ -74,9 +78,22 @@ export default function App() {
   useEffect(() => {
     if (!expanded || decoy) return
     const item = state.watchlist.find(v => secid(v) === expanded); if (!item) return
-    const load = async () => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => { const previous = old[expanded]; return { ...old, [expanded]: { ...loaded, price: loaded.price.length ? loaded.price : previous?.price ?? [], averagePrice: loaded.averagePrice.length ? loaded.averagePrice : previous?.averagePrice ?? [], minuteCapital: loaded.minuteCapital.length ? loaded.minuteCapital : previous?.minuteCapital ?? [], flow5m: loaded.flow5m ?? previous?.flow5m ?? null, flow10m: loaded.flow10m ?? previous?.flow10m ?? null, klines: loaded.klines.length ? loaded.klines : previous?.klines ?? [], capital: loaded.capital.length ? loaded.capital : previous?.capital ?? [] } } }); setSplits(old => ({ ...old, [expanded]: loaded.splitEstimate })) } finally { detailBusy.current = false } }
+    const load = async () => { if (detailBusy.current) return; detailBusy.current = true; try { const loaded = await window.marketFloat.fetchDetail(item); setDetails(old => ({ ...old, [expanded]: mergeDetail(loaded, old[expanded]) })); setSplits(old => ({ ...old, [expanded]: loaded.splitEstimate })) } finally { detailBusy.current = false } }
     load(); const timer = window.setInterval(load, Math.max(1000, state.settings.refreshMs)); return () => clearInterval(timer)
   }, [expanded, decoy, state.watchlist, state.settings.refreshMs])
+
+  useEffect(() => {
+    if (decoy || state.settings.paused) return
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      for (const item of state.watchlist.filter(v => !v.hidden).slice(0, 5)) {
+        const id = secid(item); if (cancelled || prefetched.current.has(id) || id === expanded) continue
+        prefetched.current.add(id)
+        try { const loaded = await window.marketFloat.fetchDetail(item); if (!cancelled) { setDetails(old => ({ ...old, [id]: mergeDetail(loaded, old[id]) })); setSplits(old => ({ ...old, [id]: loaded.splitEstimate })) } } catch { prefetched.current.delete(id) }
+      }
+    }, 1200)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [decoy, expanded, state.settings.paused, state.watchlist])
 
   useEffect(() => {
     if (decoy || state.settings.paused) return
@@ -88,32 +105,71 @@ export default function App() {
   useEffect(() => { if (sectorOpen) window.marketFloat.fetchSectorRank().then(setSectorRanks).catch(() => setSectorRanks([])) }, [sectorOpen])
 
   const toggleDetail = (item: WatchItem) => {
-    const id = secid(item); if (expanded === id) return setExpanded(undefined)
+    const id = secid(item); setFocused(id); if (expanded === id) return setExpanded(undefined)
     setExpanded(id)
   }
   const updateSettings = async (settings: AppState['settings']) => {
     setState(s => ({ ...s, settings })); await save({ settings }); window.marketFloat.setWindowOpacity(settings.opacity); window.marketFloat.setWindowLocked(settings.locked); window.marketFloat.setLaunchAtLogin(settings.launchAtLogin)
     const result = await window.marketFloat.updateShortcut(settings.tickerShortcut, settings.notesShortcut, settings.hideShortcut); setShortcutError(result.error)
   }
+  const visibleItems = useMemo(() => {
+    const list = state.watchlist.filter(item => !item.hidden)
+    const position = (item: WatchItem) => item.costPrice != null && (item.holdingLots ?? 0) > 0
+    const sortValue = (item: WatchItem) => {
+      const id = secid(item); const quote = quotes[id]; const detail = details[id]
+      if (state.settings.watchSortMode === 'change') return quote?.changePercent ?? -Infinity
+      if (state.settings.watchSortMode === 'mainFlow') return quote?.mainNetInflow ?? -Infinity
+      if (state.settings.watchSortMode === 'flow5m') return detail?.flow5m ?? -Infinity
+      if (state.settings.watchSortMode === 'flow10m') return detail?.flow10m ?? -Infinity
+      if (state.settings.watchSortMode === 'volumeRatio') return quote?.volumeRatio ?? -Infinity
+      if (state.settings.watchSortMode === 'profit') return calculatePositionProfit(quote?.price ?? null, item.costPrice, item.holdingLots, item.lotSize ?? 100, state.settings)?.amount ?? -Infinity
+      return 0
+    }
+    return [...list].sort((a, b) => {
+      if (state.settings.positionsFirst && position(a) !== position(b)) return position(a) ? -1 : 1
+      return state.settings.watchSortMode === 'manual' ? list.indexOf(a) - list.indexOf(b) : sortValue(b) - sortValue(a)
+    })
+  }, [state.watchlist, state.settings, quotes, details])
+
+  useEffect(() => {
+    if (decoy || settingsOpen || addOpen || hotOpen || sectorOpen || alertFor) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.matches('input,textarea,select,[contenteditable="true"]')) return
+      if (event.key === 'Escape') { setExpanded(undefined); setFocused(undefined); return }
+      if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) || !visibleItems.length) return
+      event.preventDefault()
+      if (event.key === 'Enter') { const id = focused ?? secid(visibleItems[0]); setFocused(id); setExpanded(current => current === id ? undefined : id); return }
+      const current = visibleItems.findIndex(item => secid(item) === (focused ?? expanded)); const offset = event.key === 'ArrowDown' ? 1 : -1
+      const index = current < 0 ? 0 : (current + offset + visibleItems.length) % visibleItems.length; const id = secid(visibleItems[index])
+      setFocused(id); setExpanded(id); window.setTimeout(() => document.querySelector(`[data-stock-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 0)
+    }
+    window.addEventListener('keydown', onKeyDown); return () => window.removeEventListener('keydown', onKeyDown)
+  }, [decoy, settingsOpen, addOpen, hotOpen, sectorOpen, alertFor, visibleItems, focused, expanded])
+
   const backupData = Object.values(quotes).some(v => v.status === 'delayed')
   const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} ${backupData ? '备用行情' : '更新'}` : '正在连接'
   const signalSummary = useMemo(() => state.watchlist.filter(v => !v.hidden).reduce((sum, item) => { const signal = smartSignal(quotes[secid(item)], splits[secid(item)]); if (signal) sum[signal]++; return sum }, { inflow: 0, outflow: 0 }), [state.watchlist, quotes, splits])
 
   if (decoy) return <Decoy items={state.todoItems} logs={state.todoLogs} tickerShortcut={state.settings.tickerShortcut} onItemsChange={(todoItems: TodoItem[]) => save({ todoItems })} onLogsChange={(todoLogs: TodoLog[]) => save({ todoLogs })} onSaveLog={(log: TodoLog) => save({ todoLogs: [log, ...state.todoLogs].slice(0, 180) })}/>
-  return <div className="app-shell" data-theme={state.settings.theme}>
+  return <div className={`app-shell ${state.settings.compactMode ? 'compact' : ''}`} data-theme={state.settings.theme}>
     <TitleBar locked={state.settings.locked} status={status} onLock={() => updateSettings({ ...state.settings, locked: !state.settings.locked })} onSettings={() => setSettingsOpen(true)} onHide={() => window.marketFloat.hideWindow()}/>
     <div className="toolbar">
       <div><span className="eyebrow">WATCHLIST</span><h1>自选行情</h1></div>
-      <div className="tool-actions"><button title={state.settings.theme === 'dark' ? '切换亮色' : '切换暗色'} onClick={() => updateSettings({ ...state.settings, theme: state.settings.theme === 'dark' ? 'light' : 'dark' })}>{state.settings.theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}</button><button title="热门板块 TOP 10" onClick={() => setSectorOpen(true)}><LayoutGrid size={16}/></button><button title="热度榜 TOP 10" onClick={() => setHotOpen(true)}><Flame size={16}/></button><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
+      <div className="tool-actions"><button className={state.settings.compactMode ? 'active' : ''} title="切换紧凑列表" onClick={() => updateSettings({ ...state.settings, compactMode: !state.settings.compactMode })}><Rows3 size={16}/></button><button title={state.settings.theme === 'dark' ? '切换亮色' : '切换暗色'} onClick={() => updateSettings({ ...state.settings, theme: state.settings.theme === 'dark' ? 'light' : 'dark' })}>{state.settings.theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}</button><button title="热门板块 TOP 10" onClick={() => setSectorOpen(true)}><LayoutGrid size={16}/></button><button title="热度榜 TOP 10" onClick={() => setHotOpen(true)}><Flame size={16}/></button><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
     </div>
-    {!!state.watchlist.filter(v => !v.hidden).length && <div className="scan-summary"><span><Activity size={12}/>智能扫描</span><b className="rise">流入共振 {signalSummary.inflow}</b><b className="fall">流出共振 {signalSummary.outflow}</b></div>}
+    {!!visibleItems.length && <div className="scan-summary"><span><Activity size={12}/>智能扫描</span><b className="rise">流入 {signalSummary.inflow}</b><b className="fall">流出 {signalSummary.outflow}</b><select title="自选排序" value={state.settings.watchSortMode} onChange={e => updateSettings({ ...state.settings, watchSortMode: e.target.value as AppState['settings']['watchSortMode'] })}><option value="manual">自选顺序</option><option value="change">涨幅</option><option value="mainFlow">主力净流入</option><option value="flow5m">5分钟资金</option><option value="flow10m">10分钟资金</option><option value="volumeRatio">量比</option><option value="profit">持仓盈亏</option></select></div>}
     <div className="column-head"><span>标的 / 资金动向</span><span>最新 / 涨跌</span></div>
     <section className="watchlist">
-      {state.watchlist.filter(v => !v.hidden).map(item => {
+      {visibleItems.map(item => {
         const id = secid(item); const q = quotes[id]; const split = splits[id]; const change = q?.changePercent ?? null; const open = expanded === id; const detail = details[id]; const signal = smartSignal(q, split)
-        return <article className={`stock-card ${open ? 'expanded' : ''}`} key={id}>
+        const profit = calculatePositionProfit(q?.price ?? null, item.costPrice, item.holdingLots, item.lotSize ?? 100, state.settings)
+        const flowAccelerating = detail?.flow5m != null && detail.flow10m != null && Math.sign(detail.flow5m) === Math.sign(detail.flow10m) && Math.abs(detail.flow5m) >= 1_000_000 && Math.abs(detail.flow5m) >= Math.abs(detail.flow10m) * .65
+        const average = detail?.averagePrice.at(-1)?.value; const averageBreak = q?.price != null && average != null && (q.volumeRatio ?? 0) >= 1.5
+        const nearCost = q?.price != null && item.costPrice != null && Math.abs(q.price - item.costPrice) / item.costPrice <= .005
+        return <article data-stock-id={id} className={`stock-card ${open ? 'expanded' : ''} ${focused === id ? 'keyboard-focus' : ''}`} key={id}>
           <button className="stock-main" onClick={() => toggleDetail(item)}>
-            <div className="identity"><div><span className="market-badge">{displayMarket(item.market)}</span><b>{q?.name || item.name}</b></div><small>{item.code}</small><div className={`capital ${directionClass(q?.mainNetInflow ?? null, state.settings)}`}><span>明盘</span>{fmtMoney(q?.mainNetInflow ?? null)}<em className={directionClass(split?.netAmount ?? null, state.settings)}>暗盘 {split ? fmtMoney(split.netAmount) : '扫描中'}</em></div><div className="signal-chips">{signal && <i className={`signal-chip resonance ${directionClass(signal === 'inflow' ? 1 : -1, state.settings)}`}>{signal === 'inflow' ? '流入共振' : '流出共振'}</i>}{(q?.volumeRatio ?? 0) >= 2 && <i className="signal-chip hot">量比放大</i>}{split && Math.abs(split.netAmount) >= 2_000_000 && <i className="signal-chip">疑似拆单</i>}</div></div>
+            <div className="identity"><div><span className="market-badge">{displayMarket(item.market)}</span><b>{q?.name || item.name}</b>{profit && <span className={`quick-profit ${directionClass(profit.amount, state.settings)}`}>{exactMoney(profit.amount)}元 · {profit.percent > 0 ? '+' : ''}{profit.percent.toFixed(2)}%</span>}</div><small>{item.code}</small><div className={`capital ${directionClass(q?.mainNetInflow ?? null, state.settings)}`}><span>明盘</span>{fmtMoney(q?.mainNetInflow ?? null)}<em className={directionClass(split?.netAmount ?? null, state.settings)}>暗盘 {split ? fmtMoney(split.netAmount) : '扫描中'}</em></div><div className="signal-chips">{signal && <i className={`signal-chip resonance ${directionClass(signal === 'inflow' ? 1 : -1, state.settings)}`}>{signal === 'inflow' ? '流入共振' : '流出共振'}</i>}{flowAccelerating && <i className={`signal-chip ${directionClass(detail!.flow5m, state.settings)}`}>5分钟资金加速</i>}{averageBreak && <i className={`signal-chip ${directionClass(q!.price! - average!, state.settings)}`}>{q!.price! >= average! ? '放量站上均价' : '放量跌破均价'}</i>}{nearCost && <i className="signal-chip hot">临近成本线</i>}{(q?.volumeRatio ?? 0) >= 2 && <i className="signal-chip hot">量比放大</i>}{split && Math.abs(split.netAmount) >= 2_000_000 && <i className="signal-chip">疑似拆单</i>}</div><div className="compact-metrics"><span>5m <b className={directionClass(detail?.flow5m ?? null, state.settings)}>{fmtMoney(detail?.flow5m ?? null)}</b></span><span>主力 <b className={directionClass(q?.mainNetInflow ?? null, state.settings)}>{fmtMoney(q?.mainNetInflow ?? null)}</b></span></div></div>
             <div className="quote"><b>{fmtPrice(q?.price ?? null)}</b><span className={directionClass(change, state.settings)}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></div>
             {open ? <ChevronUp className="chevron" size={14}/> : <ChevronDown className="chevron" size={14}/>} 
           </button>
@@ -130,7 +186,7 @@ export default function App() {
           </div>}
         </article>
       })}
-      {!state.watchlist.filter(v => !v.hidden).length && <div className="empty"><Eye size={26}/><b>还没有自选标的</b><span>添加股票后，会在这里低调刷新</span><button onClick={() => setAddOpen(true)}>添加第一只</button></div>}
+      {!visibleItems.length && <div className="empty"><Eye size={26}/><b>还没有自选标的</b><span>添加股票后，会在这里低调刷新</span><button onClick={() => setAddOpen(true)}>添加第一只</button></div>}
     </section>
     <footer className="app-footer"><span className={networkError || backupData ? 'warn' : ''}><i/>{networkError ? '连接异常' : backupData ? '备用行情 · 资金保留上次值' : state.settings.paused ? '刷新已暂停' : `${isTradingTime() ? state.settings.refreshMs / 1000 : 60} 秒刷新`}</span><span>主力 = 大单 + 超大单净额</span></footer>
     {settingsOpen && <SettingsPanel value={state.settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} shortcutError={shortcutError}/>} 
@@ -148,7 +204,6 @@ function PositionCard({ item, price, settings, onSave }: { item: WatchItem; pric
   const [lotSize, setLotSize] = useState((item.lotSize ?? defaultLotSize).toString())
   useEffect(() => { setCost(item.costPrice?.toString() ?? ''); setLots(item.holdingLots?.toString() ?? ''); setLotSize((item.lotSize ?? defaultLotSize).toString()) }, [item.costPrice, item.holdingLots, item.lotSize, defaultLotSize])
   const profit = calculatePositionProfit(price, item.costPrice, item.holdingLots, item.lotSize ?? defaultLotSize, settings)
-  const exactMoney = (value: number) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(value))}`
   const persist = () => {
     const costPrice = Number(cost); const holdingLots = Number(lots); const size = Number(lotSize)
     if (!Number.isFinite(costPrice) || costPrice <= 0 || !Number.isFinite(holdingLots) || holdingLots < 0 || !Number.isFinite(size) || size <= 0) return
@@ -195,8 +250,8 @@ function AddStock({ state, onSave, onClose }: { state: AppState; onSave(p: Parti
 }
 
 function HotRankPanel({ items, state, onSave, onClose }: { items: HotRankItem[]; state: AppState; onSave(p: Partial<AppState>): void; onClose(): void }) {
-  const add = (item: HotRankItem) => { if (state.watchlist.some(v => secid(v) === secid(item))) return; onSave({ watchlist: [...state.watchlist, { market: item.market, code: item.code, name: item.name }] }) }
-  return <div className="overlay"><section className="panel hot-panel"><div className="panel-head"><div><small>A 股实时人气</small><h2>热度排行榜 TOP 10</h2></div><button onClick={onClose}><X size={18}/></button></div><div className="hot-list">{items.length ? items.map(item => { const added = state.watchlist.some(v => secid(v) === secid(item)); return <div key={secid(item)}><strong>{item.rank}</strong><span><b>{item.name}</b><small>{item.code}</small></span><em className={directionClass(item.changePercent, state.settings)}>{item.changePercent == null ? '—' : `${item.changePercent > 0 ? '+' : ''}${item.changePercent.toFixed(2)}%`}</em><button disabled={added} onClick={() => add(item)}>{added ? '已添加' : '+ 自选'}</button></div>}) : <p>热度数据加载中或暂时不可用</p>}</div><p className="fineprint">热度排名来自公开行情源，仅反映关注度，不代表买卖建议。</p></section></div>
+  const add = (item: HotRankItem) => { const exists = state.watchlist.some(v => secid(v) === secid(item)); onSave({ watchlist: exists ? state.watchlist.map(v => secid(v) === secid(item) ? { ...v, hidden: false, name: item.name } : v) : [...state.watchlist, { market: item.market, code: item.code, name: item.name }] }) }
+  return <div className="overlay"><section className="panel hot-panel"><div className="panel-head"><div><small>A 股实时人气</small><h2>热度排行榜 TOP 10</h2></div><button onClick={onClose}><X size={18}/></button></div><div className="hot-list">{items.length ? items.map(item => { const added = state.watchlist.some(v => secid(v) === secid(item) && !v.hidden); return <div key={secid(item)}><strong>{item.rank}</strong><span><b>{item.name}</b><small>{item.code}</small></span><em className={directionClass(item.changePercent, state.settings)}>{item.changePercent == null ? '—' : `${item.changePercent > 0 ? '+' : ''}${item.changePercent.toFixed(2)}%`}</em><button disabled={added} onClick={() => add(item)}>{added ? '已添加' : '+ 自选'}</button></div>}) : <p>热度数据加载中或暂时不可用</p>}</div><p className="fineprint">热度排名来自公开行情源，仅反映关注度，不代表买卖建议。</p></section></div>
 }
 
 function AlertEditor({ stock, alerts, onSave, onClose }: { stock: WatchItem; alerts: PriceAlert[]; onSave(v: PriceAlert[]): void; onClose(): void }) {

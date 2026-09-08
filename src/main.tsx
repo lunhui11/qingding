@@ -8,4 +8,5 @@ import './theme.css'
 import './decoy-v2.css'
 import './candlestick.css'
 import './hot-rank.css'
+import './watch-optimizer.css'
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>)

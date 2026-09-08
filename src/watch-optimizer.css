@@ -1,0 +1,20 @@
+.scan-summary select { max-width: 82px; border: 1px solid #2d3942; border-radius: 4px; background: #10171c; color: #85929a; padding: 2px 3px; font-size: 8px; outline: none; }
+.identity { min-width: 0; }
+.identity > div:first-child { min-width: 0; }
+.identity > div:first-child > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-profit { margin-left: auto; padding-left: 4px; font-size: 8px; font-weight: 600; white-space: nowrap; }
+.compact-metrics { display: none; }
+.stock-card.keyboard-focus { border-color: var(--teal); box-shadow: inset 0 0 0 1px #55d6be33; }
+.app-shell.compact .toolbar { padding-top: 10px; padding-bottom: 8px; }
+.app-shell.compact .toolbar h1 { font-size: 17px; }
+.app-shell.compact .column-head { margin-bottom: 3px; }
+.app-shell.compact .stock-card:not(.expanded) { margin: 3px 0; border-radius: 7px; }
+.app-shell.compact .stock-card:not(.expanded) .stock-main { min-height: 54px; padding-top: 7px; padding-bottom: 7px; }
+.app-shell.compact .stock-card:not(.expanded) .identity > small,
+.app-shell.compact .stock-card:not(.expanded) .capital,
+.app-shell.compact .stock-card:not(.expanded) .signal-chips { display: none; }
+.app-shell.compact .stock-card:not(.expanded) .compact-metrics { display: flex; gap: 8px; margin: 4px 0 0 25px; color: #65727c; font-size: 8px; }
+.app-shell.compact .stock-card:not(.expanded) .compact-metrics b { font-weight: 600; }
+.app-shell.compact .stock-card:not(.expanded) .quote b { font-size: 15px; }
+.app-shell.compact .stock-card:not(.expanded) .quote span { font-size: 10px; }
+.app-shell[data-theme="light"] .scan-summary select { border-color: #d1dce0; background: #f5f7f8; color: #53636b; }
