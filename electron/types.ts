@@ -9,6 +9,8 @@ export interface Quote { market: Market; code: string; name: string; price: numb
 export interface DetailData { price: TrendPoint[]; averagePrice: TrendPoint[]; capital: TrendPoint[]; minuteCapital: TrendPoint[]; flow5m: number | null; flow10m: number | null; klines: KlinePoint[]; splitSignals: SplitSignal[]; splitEstimate: SplitEstimate; updatedAt: string }
 export interface HotRankItem extends Quote { rank: number; rankChange: number }
 export interface SectorRankItem { code: string; name: string; kind: 'industry' | 'concept'; changePercent: number | null; mainNetInflow: number | null; mainNetRatio: number | null }
+export type SectorLeaderLabel = '涨幅龙头' | '人气龙头' | '资金龙头'
+export interface SectorStockItem extends Quote { leaderLabels: SectorLeaderLabel[]; popularityRank: number | null }
 export interface PriceAlert { id: string; secid: string; metric: 'priceAbove' | 'priceBelow' | 'changeAbove' | 'changeBelow'; threshold: number; enabled: boolean; lastTriggered?: number }
 export interface TodoItem { id: string; text: string; tag: string; completed: boolean; createdAt: string; completedAt?: string }
 export interface TodoLog { id: string; savedAt: string; items: TodoItem[] }

@@ -18,3 +18,29 @@
 .sector-list > div > i small { font-size: 8px; opacity: .72; }
 .sector-list > p { text-align: center; color: #68757e; font-size: 11px; padding: 35px 0; }
 .signal-chips i { font-style: normal; }
+.sector-row { width: 100%; display: grid; grid-template-columns: 25px 1fr 48px 72px; align-items: center; gap: 6px; min-height: 45px; padding: 0; border: 0; border-bottom: 1px solid #273139; background: none; text-align: left; cursor: pointer; }
+.sector-row:hover { background: #202a31; }
+.sector-row > strong { color: #f0ae70; text-align: center; }
+.sector-row > span { display: flex; flex-direction: column; font-size: 11px; }
+.sector-row > span small { color: #65727c; font-size: 8px; margin-top: 2px; }
+.sector-row > em { font-style: normal; font-size: 10px; text-align: right; }
+.sector-row > i { font-style: normal; font-size: 10px; text-align: right; display: flex; flex-direction: column; }
+.sector-row > i small { font-size: 8px; opacity: .72; }
+.sector-panel .panel-head > div { min-width: 0; }
+.sector-panel .back-button { width: auto; height: auto; display: flex; gap: 3px; padding: 3px 0; margin-bottom: 4px; color: var(--teal); font-size: 9px; }
+.sector-stock-list > div { display: grid; grid-template-columns: 23px minmax(0,1fr) 58px 44px; align-items: center; gap: 6px; min-height: 52px; border-bottom: 1px solid #273139; }
+.sector-stock-list > div > strong { color: #f0ae70; text-align: center; font-size: 11px; }
+.sector-stock-list > div > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sector-stock-list > div > span > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.sector-stock-list > div > span > small { color: #65727c; font-size: 8px; }
+.sector-stock-list > div > span > em { display: flex; gap: 3px; flex-wrap: wrap; }
+.sector-stock-list > div > span > em i { padding: 1px 3px; border-radius: 3px; background: #4a3526; color: #f5b879; font-size: 7px; font-style: normal; }
+.sector-stock-list .sector-quote { text-align: right; }
+.sector-stock-list .sector-quote b { font-size: 11px; }
+.sector-stock-list > div > button { border: 1px solid #34424b; background: #202a31; color: #8fdaca; border-radius: 5px; padding: 4px 2px; font-size: 8px; cursor: pointer; }
+.sector-stock-list > div > button:disabled { color: #59656e; cursor: default; }
+.sector-stock-list > p { text-align: center; color: #68757e; font-size: 11px; padding: 35px 0; }
+.hidden-stocks { margin: 10px 0 0; padding: 8px; border: 1px solid #2c3840; border-radius: 7px; background: #141b20; }
+.hidden-stocks header { margin-bottom: 4px; color: #6f7d86; font-size: 9px; }
+.hidden-stocks button { width: 100%; display: grid; grid-template-columns: 18px 1fr auto 30px; align-items: center; gap: 4px; padding: 6px 2px; border: 0; border-top: 1px solid #252f36; background: none; text-align: left; cursor: pointer; }
+.hidden-stocks button span { font-size: 10px; }.hidden-stocks button small { color: #65727c; font-size: 8px; }.hidden-stocks button b { color: var(--teal); font-size: 8px; text-align: right; }

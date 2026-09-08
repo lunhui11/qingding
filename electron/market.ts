@@ -1,7 +1,8 @@
-import type { DetailData, HotRankItem, Market, Quote, SearchResult, SectorRankItem, SplitEstimate, SplitSignal, TradePrint, TrendPoint, WatchItem } from './types'
+import { net } from 'electron'
+import type { DetailData, HotRankItem, Market, Quote, SearchResult, SectorRankItem, SectorStockItem, SplitEstimate, SplitSignal, TradePrint, TrendPoint, WatchItem } from './types'
 
 const fields = 'f12,f13,f14,f2,f3,f4,f5,f6,f8,f10,f18,f21,f62,f184,f66,f72'
-const headers = { Referer: 'https://quote.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 MarketFloat/1.0' }
+const headers = { Accept: 'application/json,text/plain,*/*', Referer: 'https://quote.eastmoney.com/', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/132.0.0.0 Safari/537.36' }
 
 export function toSecid(item: Pick<WatchItem, 'market' | 'code'>): string {
   if (item.market === 'SH') return `1.${item.code}`
@@ -12,16 +13,44 @@ export function marketFromId(id: number, code: string): Market { return id === 1
 const scaled = (value: unknown, divisor = 100): number | null => typeof value === 'number' && Number.isFinite(value) ? value / divisor : null
 
 async function getJson(url: string, timeout = 8000): Promise<any> {
-  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeout)
-  try { const response = await fetch(url, { headers, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return await response.json() }
-  finally { clearTimeout(timer) }
+  let lastError: unknown
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeout + attempt * 3000)
+    try { const response = await net.fetch(url, { headers, signal: controller.signal }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return await response.json() }
+    catch (error) { lastError = error }
+    finally { clearTimeout(timer) }
+  }
+  throw lastError
+}
+
+const numberOrNull = (value: string | undefined) => { const parsed = Number(value); return value && Number.isFinite(parsed) ? parsed : null }
+export function parseTencentQuotes(text: string, items: WatchItem[]): Quote[] {
+  const rows = new Map([...text.matchAll(/v_([^=]+)="([^"]*)"/g)].map(match => [match[1].toLowerCase(), match[2].split('~')]))
+  const now = new Date().toISOString()
+  return items.map(item => {
+    const symbol = `${item.market === 'HK' ? 'hk' : item.market.toLowerCase()}${item.code}`; const row = rows.get(symbol)
+    if (!row) return { ...item, price: null, previousClose: null, change: null, changePercent: null, mainNetInflow: null, mainNetRatio: null, superLargeNet: null, largeNet: null, amount: null, volumeRatio: null, actualTurnoverRate: null, updatedAt: now, status: 'offline' as const }
+    return { ...item, name: row[1] || item.name, price: numberOrNull(row[3]), previousClose: numberOrNull(row[4]), change: numberOrNull(row[31]), changePercent: numberOrNull(row[32]), mainNetInflow: null, mainNetRatio: null, superLargeNet: null, largeNet: null, amount: null, volumeRatio: null, actualTurnoverRate: numberOrNull(row[38]), updatedAt: now, status: 'delayed' as const }
+  })
+}
+
+async function fetchBackupQuotes(items: WatchItem[]): Promise<Quote[]> {
+  const symbols = items.map(item => `${item.market === 'HK' ? 'hk' : item.market.toLowerCase()}${item.code}`).join(',')
+  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 10000)
+  try {
+    const response = await net.fetch(`https://qt.gtimg.cn/q=${symbols}`, { headers: { Referer: 'https://gu.qq.com/', 'User-Agent': headers['User-Agent'] }, signal: controller.signal })
+    if (!response.ok) throw new Error(`Backup HTTP ${response.status}`)
+    const bytes = await response.arrayBuffer(); return parseTencentQuotes(new TextDecoder('gbk').decode(bytes), items)
+  } finally { clearTimeout(timer) }
 }
 
 export async function fetchQuotes(items: WatchItem[]): Promise<Quote[]> {
   if (!items.length) return []
   const secids = items.map(toSecid).join(',')
   const url = `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=${fields}&secids=${encodeURIComponent(secids)}`
-  const json = await getJson(url); const rows: any[] = json?.data?.diff ?? []
+  let json: any
+  try { json = await getJson(url) } catch { return fetchBackupQuotes(items) }
+  const rows: any[] = json?.data?.diff ?? []
   const now = new Date().toISOString()
   return items.map(item => {
     const expectedMarket = item.market === 'HK' ? 116 : item.market === 'SH' ? 1 : 0
@@ -101,12 +130,16 @@ export function estimateSplitFlow(trades: TradePrint[], market: Market): SplitEs
 }
 
 export async function fetchHotRank(): Promise<HotRankItem[]> {
-  const response = await fetch('https://emappdata.eastmoney.com/stockrank/getAllCurrentList', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ appId: 'appId01', globalId: '786e4c21-70dc-435a-93bb-38', marketType: '', pageNo: 1, pageSize: 10 }) })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const json: any = await response.json(); const ranks: any[] = json?.data ?? []
+  const ranks = await fetchPopularityRows(10)
   const items: WatchItem[] = ranks.map(v => ({ market: String(v.sc).startsWith('SH') ? 'SH' : 'SZ', code: String(v.sc).slice(2), name: String(v.sc) }))
   const quotes = await fetchQuotes(items)
   return quotes.map((quote, i) => ({ ...quote, rank: Number(ranks[i]?.rk ?? i + 1), rankChange: Number(ranks[i]?.hisRc ?? 0) }))
+}
+
+async function fetchPopularityRows(pageSize: number): Promise<any[]> {
+  const response = await net.fetch('https://emappdata.eastmoney.com/stockrank/getAllCurrentList', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ appId: 'appId01', globalId: '786e4c21-70dc-435a-93bb-38', marketType: '', pageNo: 1, pageSize }) })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const json: any = await response.json(); return json?.data ?? []
 }
 
 export async function fetchSectorRank(): Promise<SectorRankItem[]> {
@@ -117,6 +150,26 @@ export async function fetchSectorRank(): Promise<SectorRankItem[]> {
   }
   const results = await Promise.allSettled([load('industry', 'm:90+t:2'), load('concept', 'm:90+t:3')])
   return results.flatMap(result => result.status === 'fulfilled' ? result.value : []).filter(item => item.name && item.mainNetInflow != null).sort((a, b) => (b.mainNetInflow ?? 0) - (a.mainNetInflow ?? 0)).slice(0, 10)
+}
+
+export async function fetchSectorStocks(sector: SectorRankItem): Promise<SectorStockItem[]> {
+  const url = `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=100&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${encodeURIComponent(`b:${sector.code}`)}&fields=${fields}`
+  const json = await getJson(url); const rows: any[] = json?.data?.diff ?? []; const now = new Date().toISOString()
+  const quotes: Quote[] = rows.filter(row => [0, 1].includes(Number(row.f13))).map(row => {
+    const market: Market = Number(row.f13) === 1 ? 'SH' : 'SZ'; const code = String(row.f12 ?? '').padStart(6, '0')
+    return { market, code, name: String(row.f14 ?? code), price: scaled(row.f2, 1), previousClose: scaled(row.f18, 1), change: scaled(row.f4, 1), changePercent: scaled(row.f3, 1), mainNetInflow: scaled(row.f62, 1), mainNetRatio: scaled(row.f184, 1), superLargeNet: scaled(row.f66, 1), largeNet: scaled(row.f72, 1), amount: scaled(row.f6, 1), volumeRatio: scaled(row.f10, 1), actualTurnoverRate: scaled(row.f8, 1), updatedAt: now, status: 'live' as const }
+  }).filter(item => item.changePercent != null).sort((a, b) => (b.changePercent ?? -Infinity) - (a.changePercent ?? -Infinity)).slice(0, 20)
+  let popularity = new Map<string, number>()
+  try { popularity = new Map((await fetchPopularityRows(100)).map((row, index) => [String(row.sc).toUpperCase(), Number(row.rk ?? index + 1)])) } catch { /* popularity label stays unavailable */ }
+  return labelSectorLeaders(quotes, popularity)
+}
+
+export function labelSectorLeaders(quotes: Quote[], popularity: Map<string, number>): SectorStockItem[] {
+  const key = (item: Quote) => `${item.market}${item.code}`
+  const gainLeader = quotes[0] ? key(quotes[0]) : ''
+  const capitalLeader = [...quotes].filter(item => item.mainNetInflow != null).sort((a, b) => (b.mainNetInflow ?? -Infinity) - (a.mainNetInflow ?? -Infinity))[0]
+  const popularityLeader = [...quotes].filter(item => popularity.has(key(item))).sort((a, b) => popularity.get(key(a))! - popularity.get(key(b))!)[0]
+  return quotes.map(item => ({ ...item, popularityRank: popularity.get(key(item)) ?? null, leaderLabels: [key(item) === gainLeader ? '涨幅龙头' : null, capitalLeader && key(item) === key(capitalLeader) ? '资金龙头' : null, popularityLeader && key(item) === key(popularityLeader) ? '人气龙头' : null].filter(Boolean) as SectorStockItem['leaderLabels'] }))
 }
 
 export function parseDirectCode(query: string): SearchResult[] {

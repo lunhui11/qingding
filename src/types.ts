@@ -12,6 +12,8 @@ export interface Quote {
 export interface DetailData { price: TrendPoint[]; averagePrice: TrendPoint[]; capital: TrendPoint[]; minuteCapital: TrendPoint[]; flow5m: number | null; flow10m: number | null; klines: KlinePoint[]; splitSignals: SplitSignal[]; splitEstimate: SplitEstimate; updatedAt: string }
 export interface HotRankItem extends Quote { rank: number; rankChange: number }
 export interface SectorRankItem { code: string; name: string; kind: 'industry' | 'concept'; changePercent: number | null; mainNetInflow: number | null; mainNetRatio: number | null }
+export type SectorLeaderLabel = '涨幅龙头' | '人气龙头' | '资金龙头'
+export interface SectorStockItem extends Quote { leaderLabels: SectorLeaderLabel[]; popularityRank: number | null }
 export type AlertMetric = 'priceAbove' | 'priceBelow' | 'changeAbove' | 'changeBelow'
 export interface PriceAlert { id: string; secid: string; metric: AlertMetric; threshold: number; enabled: boolean; lastTriggered?: number }
 export interface TodoItem { id: string; text: string; tag: string; completed: boolean; createdAt: string; completedAt?: string }
@@ -27,7 +29,7 @@ export interface SearchResult { market: Market; code: string; name: string }
 export interface MarketFloatAPI {
   loadState(): Promise<AppState>; saveState(patch: Partial<AppState>): Promise<AppState>;
   fetchQuotes(items: WatchItem[]): Promise<Quote[]>; fetchDetail(item: WatchItem): Promise<DetailData>;
-  fetchSplitEstimate(item: WatchItem): Promise<SplitEstimate>; fetchHotRank(): Promise<HotRankItem[]>; fetchSectorRank(): Promise<SectorRankItem[]>;
+  fetchSplitEstimate(item: WatchItem): Promise<SplitEstimate>; fetchHotRank(): Promise<HotRankItem[]>; fetchSectorRank(): Promise<SectorRankItem[]>; fetchSectorStocks(sector: SectorRankItem): Promise<SectorStockItem[]>;
   searchStocks(query: string): Promise<SearchResult[]>; toggleDecoy(): Promise<boolean>; setDecoy(value: boolean): Promise<boolean>;
   setWindowOpacity(value: number): Promise<void>; setWindowLocked(value: boolean): Promise<void>;
   updateShortcut(tickerValue: string, notesValue: string, hideValue: string): Promise<{ ok: boolean; error?: string }>; setLaunchAtLogin(value: boolean): Promise<void>;

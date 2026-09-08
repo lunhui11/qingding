@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppState, WatchItem } from './types'
+import type { AppState, SectorRankItem, WatchItem } from './types'
 
 contextBridge.exposeInMainWorld('marketFloat', {
   loadState: () => ipcRenderer.invoke('state:load'),
@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('marketFloat', {
   fetchSplitEstimate: (item: WatchItem) => ipcRenderer.invoke('market:split', item),
   fetchHotRank: () => ipcRenderer.invoke('market:hot-rank'),
   fetchSectorRank: () => ipcRenderer.invoke('market:sector-rank'),
+  fetchSectorStocks: (sector: SectorRankItem) => ipcRenderer.invoke('market:sector-stocks', sector),
   searchStocks: (query: string) => ipcRenderer.invoke('market:search', query),
   toggleDecoy: () => ipcRenderer.invoke('window:toggle-decoy'),
   setDecoy: (value: boolean) => ipcRenderer.invoke('window:set-decoy', value),

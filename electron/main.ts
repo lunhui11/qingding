@@ -1,6 +1,6 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, Notification, screen, Tray } from 'electron'
 import path from 'node:path'
-import { fetchDetail, fetchHotRank, fetchQuotes, fetchSectorRank, fetchSplitEstimate, searchStocks } from './market'
+import { fetchDetail, fetchHotRank, fetchQuotes, fetchSectorRank, fetchSectorStocks, fetchSplitEstimate, searchStocks } from './market'
 import { getState, patchState } from './store'
 
 process.env.ELECTRON_DISABLE_LOGGING = 'true'
@@ -82,6 +82,7 @@ function setupIpc() {
   ipcMain.handle('market:split', (_, item) => fetchSplitEstimate(item))
   ipcMain.handle('market:hot-rank', () => fetchHotRank())
   ipcMain.handle('market:sector-rank', () => fetchSectorRank())
+  ipcMain.handle('market:sector-stocks', (_, sector) => fetchSectorStocks(sector))
   ipcMain.handle('market:search', (_, query) => searchStocks(String(query).slice(0, 30)))
   ipcMain.handle('window:toggle-decoy', toggleDecoy)
   ipcMain.handle('window:set-decoy', (_, value) => setDecoy(Boolean(value)))

@@ -96,6 +96,15 @@
 .app-shell[data-theme="light"] .flow-window-grid span { color: #75838a; }
 .app-shell[data-theme="light"] .sector-list > div { border-color: #e1e8eb; }
 .app-shell[data-theme="light"] .sector-list > div > span small { color: #77858c; }
+.app-shell[data-theme="light"] .sector-row,
+.app-shell[data-theme="light"] .sector-stock-list > div { border-color: #e1e8eb; }
+.app-shell[data-theme="light"] .sector-row:hover { background: #f2f5f6; }
+.app-shell[data-theme="light"] .sector-row > span small,
+.app-shell[data-theme="light"] .sector-stock-list > div > span > small { color: #77858c; }
+.app-shell[data-theme="light"] .sector-stock-list > div > button { border-color: #d1dde1; background: #f3f6f7; color: #197765; }
+.app-shell[data-theme="light"] .sector-stock-list > div > span > em i { background: #fff0df; color: #a85b18; }
+.app-shell[data-theme="light"] .hidden-stocks { border-color: #d7e0e4; background: #f6f8f9; }
+.app-shell[data-theme="light"] .hidden-stocks button { border-color: #e1e8eb; }
 .app-shell[data-theme="light"] .candlestick .cost-line { stroke: #334148; }
 .app-shell[data-theme="light"] .cost-legend { color: #46575f; }
 .app-shell[data-theme="light"] .position-card { border-color: #d7e0e4; background: #f6f8f9; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, LayoutGrid, Moon, Pause, Play, Plus, Search, Sun, Trash2, X } from 'lucide-react'
-import type { AppState, DetailData, HotRankItem, PriceAlert, Quote, SearchResult, SectorRankItem, SplitEstimate, TodoItem, TodoLog, WatchItem } from './types'
+import { Activity, ArrowLeft, Bell, ChevronDown, ChevronUp, Eye, EyeOff, Flame, LayoutGrid, Moon, Pause, Play, Plus, Search, Sun, Trash2, X } from 'lucide-react'
+import type { AppState, DetailData, HotRankItem, PriceAlert, Quote, SearchResult, SectorRankItem, SectorStockItem, SplitEstimate, TodoItem, TodoLog, WatchItem } from './types'
 import { alertTriggered, calculatePositionProfit, directionClass, displayMarket, fmtMoney, fmtPrice, isTradingTime, secid, smartSignal } from './utils'
 import Sparkline from './components/Sparkline'
 import TitleBar from './components/TitleBar'
@@ -59,7 +59,7 @@ export default function App() {
     busy.current = true
     try {
       const incoming = await window.marketFloat.fetchQuotes(state.watchlist.filter(v => !v.hidden))
-      setQuotes(old => ({ ...old, ...Object.fromEntries(incoming.map(v => [secid(v), v])) })); setLastUpdated(new Date()); setNetworkError(false); checkAlerts(incoming)
+      setQuotes(old => ({ ...old, ...Object.fromEntries(incoming.map(v => { const id = secid(v); const previous = old[id]; return [id, v.status === 'delayed' && previous ? { ...previous, ...v, mainNetInflow: v.mainNetInflow ?? previous.mainNetInflow, mainNetRatio: v.mainNetRatio ?? previous.mainNetRatio, superLargeNet: v.superLargeNet ?? previous.superLargeNet, largeNet: v.largeNet ?? previous.largeNet, amount: v.amount ?? previous.amount, volumeRatio: v.volumeRatio ?? previous.volumeRatio, actualTurnoverRate: v.actualTurnoverRate ?? previous.actualTurnoverRate } : v] })) })); setLastUpdated(new Date()); setNetworkError(incoming.every(v => v.status === 'offline')); checkAlerts(incoming)
     } catch { setNetworkError(true); setQuotes(old => Object.fromEntries(Object.entries(old).map(([k, v]) => [k, { ...v, status: 'delayed' }]))) }
     finally { busy.current = false }
   }, [state.watchlist, state.settings.paused, checkAlerts])
@@ -95,7 +95,8 @@ export default function App() {
     setState(s => ({ ...s, settings })); await save({ settings }); window.marketFloat.setWindowOpacity(settings.opacity); window.marketFloat.setWindowLocked(settings.locked); window.marketFloat.setLaunchAtLogin(settings.launchAtLogin)
     const result = await window.marketFloat.updateShortcut(settings.tickerShortcut, settings.notesShortcut, settings.hideShortcut); setShortcutError(result.error)
   }
-  const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} 更新` : '正在连接'
+  const backupData = Object.values(quotes).some(v => v.status === 'delayed')
+  const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} ${backupData ? '备用行情' : '更新'}` : '正在连接'
   const signalSummary = useMemo(() => state.watchlist.filter(v => !v.hidden).reduce((sum, item) => { const signal = smartSignal(quotes[secid(item)], splits[secid(item)]); if (signal) sum[signal]++; return sum }, { inflow: 0, outflow: 0 }), [state.watchlist, quotes, splits])
 
   if (decoy) return <Decoy items={state.todoItems} logs={state.todoLogs} tickerShortcut={state.settings.tickerShortcut} onItemsChange={(todoItems: TodoItem[]) => save({ todoItems })} onLogsChange={(todoLogs: TodoLog[]) => save({ todoLogs })} onSaveLog={(log: TodoLog) => save({ todoLogs: [log, ...state.todoLogs].slice(0, 180) })}/>
@@ -131,11 +132,11 @@ export default function App() {
       })}
       {!state.watchlist.filter(v => !v.hidden).length && <div className="empty"><Eye size={26}/><b>还没有自选标的</b><span>添加股票后，会在这里低调刷新</span><button onClick={() => setAddOpen(true)}>添加第一只</button></div>}
     </section>
-    <footer className="app-footer"><span className={networkError ? 'warn' : ''}><i/>{networkError ? '数据延迟' : state.settings.paused ? '刷新已暂停' : `${isTradingTime() ? state.settings.refreshMs / 1000 : 60} 秒刷新`}</span><span>主力 = 大单 + 超大单净额</span></footer>
+    <footer className="app-footer"><span className={networkError || backupData ? 'warn' : ''}><i/>{networkError ? '连接异常' : backupData ? '备用行情 · 资金保留上次值' : state.settings.paused ? '刷新已暂停' : `${isTradingTime() ? state.settings.refreshMs / 1000 : 60} 秒刷新`}</span><span>主力 = 大单 + 超大单净额</span></footer>
     {settingsOpen && <SettingsPanel value={state.settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} shortcutError={shortcutError}/>} 
     {addOpen && <AddStock state={state} onSave={save} onClose={() => setAddOpen(false)}/>} 
     {hotOpen && <HotRankPanel items={hotRanks} state={state} onSave={save} onClose={() => setHotOpen(false)}/>} 
-    {sectorOpen && <SectorRankPanel items={sectorRanks} settings={state.settings} onClose={() => setSectorOpen(false)}/>} 
+    {sectorOpen && <SectorRankPanel items={sectorRanks} state={state} onSave={save} onClose={() => setSectorOpen(false)}/>}
     {alertFor && <AlertEditor stock={state.watchlist.find(v => secid(v) === alertFor)!} alerts={state.alerts.filter(a => a.secid === alertFor)} onSave={alerts => save({ alerts: [...state.alerts.filter(a => a.secid !== alertFor), ...alerts] })} onClose={() => setAlertFor(undefined)}/>} 
   </div>
 }
@@ -170,15 +171,27 @@ function PositionCard({ item, price, settings, onSave }: { item: WatchItem; pric
   </section>
 }
 
-function SectorRankPanel({ items, settings, onClose }: { items: SectorRankItem[]; settings: AppState['settings']; onClose(): void }) {
-  return <div className="overlay"><section className="panel hot-panel"><div className="panel-head"><div><small>按主力净流入排序</small><h2>热门板块 TOP 10</h2></div><button onClick={onClose}><X size={18}/></button></div><div className="sector-list">{items.length ? items.map((item, index) => <div key={`${item.kind}-${item.code}`}><strong>{index + 1}</strong><span><b>{item.name}</b><small>{item.kind === 'industry' ? '行业' : '概念'} · {item.code}</small></span><em className={directionClass(item.changePercent, settings)}>{item.changePercent == null ? '—' : `${item.changePercent > 0 ? '+' : ''}${item.changePercent.toFixed(2)}%`}</em><i className={directionClass(item.mainNetInflow, settings)}>{fmtMoney(item.mainNetInflow)}<small>{item.mainNetRatio == null ? '' : `${item.mainNetRatio.toFixed(2)}%`}</small></i></div>) : <p>板块数据加载中或暂时不可用</p>}</div><p className="fineprint">合并行业与概念板块，按公开行情源主力净流入排序，仅反映当日资金热度。</p></section></div>
+function SectorRankPanel({ items, state, onSave, onClose }: { items: SectorRankItem[]; state: AppState; onSave(patch: Partial<AppState>): void; onClose(): void }) {
+  const [selected, setSelected] = useState<SectorRankItem>()
+  const [stocks, setStocks] = useState<SectorStockItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const openSector = async (sector: SectorRankItem) => { setSelected(sector); setStocks([]); setLoading(true); try { setStocks(await window.marketFloat.fetchSectorStocks(sector)) } catch { setStocks([]) } finally { setLoading(false) } }
+  const add = (stock: SectorStockItem) => { const id = secid(stock); const exists = state.watchlist.some(item => secid(item) === id); onSave({ watchlist: exists ? state.watchlist.map(item => secid(item) === id ? { ...item, hidden: false, name: stock.name } : item) : [...state.watchlist, { market: stock.market, code: stock.code, name: stock.name }] }) }
+  const back = () => { setSelected(undefined); setStocks([]) }
+  return <div className="overlay"><section className="panel hot-panel sector-panel">
+    <div className="panel-head"><div>{selected && <button className="back-button" onClick={back}><ArrowLeft size={14}/>返回板块榜</button>}<small>{selected ? `${selected.kind === 'industry' ? '行业' : '概念'} · 涨幅排序` : '按主力净流入排序'}</small><h2>{selected ? `${selected.name} · 涨幅前 20` : '热门板块 TOP 10'}</h2></div><button onClick={onClose}><X size={18}/></button></div>
+    {selected ? <div className="sector-stock-list">{loading ? <p>正在获取板块成分股…</p> : stocks.length ? stocks.map((stock, index) => { const added = state.watchlist.some(item => secid(item) === secid(stock) && !item.hidden); return <div key={secid(stock)}><strong>{index + 1}</strong><span><b>{stock.name}</b><small>{stock.code}{stock.popularityRank ? ` · 人气 ${stock.popularityRank}` : ''}</small><em>{stock.leaderLabels.map(label => <i key={label}>{label}</i>)}</em></span><span className="sector-quote"><b>{fmtPrice(stock.price)}</b><small className={directionClass(stock.changePercent, state.settings)}>{stock.changePercent == null ? '—' : `${stock.changePercent > 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%`}</small></span><button disabled={added} onClick={() => add(stock)}>{added ? '已自选' : '+ 自选'}</button></div>}) : <p>板块成分股暂时不可用</p>}</div> : <div className="sector-list">{items.length ? items.map((item, index) => <button className="sector-row" onClick={() => openSector(item)} key={`${item.kind}-${item.code}`}><strong>{index + 1}</strong><span><b>{item.name}</b><small>{item.kind === 'industry' ? '行业' : '概念'} · {item.code}</small></span><em className={directionClass(item.changePercent, state.settings)}>{item.changePercent == null ? '—' : `${item.changePercent > 0 ? '+' : ''}${item.changePercent.toFixed(2)}%`}</em><i className={directionClass(item.mainNetInflow, state.settings)}>{fmtMoney(item.mainNetInflow)}<small>{item.mainNetRatio == null ? '' : `${item.mainNetRatio.toFixed(2)}%`}</small></i></button>) : <p>板块数据加载中或暂时不可用</p>}</div>}
+    <p className="fineprint">{selected ? '涨幅与资金龙头按当前板块榜数据计算；人气龙头来自公开实时人气榜。龙头标签仅描述当前数据，不代表投资建议。' : '点击板块可查看涨幅前 20 成分股及龙头标记。'}</p>
+  </section></div>
 }
 
 function AddStock({ state, onSave, onClose }: { state: AppState; onSave(p: Partial<AppState>): void; onClose(): void }) {
   const [query, setQuery] = useState(''); const [results, setResults] = useState<SearchResult[]>([]); const [loading, setLoading] = useState(false); const timer = useRef<number | undefined>(undefined)
   const search = (value: string) => { setQuery(value); clearTimeout(timer.current); if (!value.trim()) return setResults([]); timer.current = window.setTimeout(async () => { setLoading(true); try { setResults(await window.marketFloat.searchStocks(value)) } finally { setLoading(false) } }, 300) }
   const add = (item: SearchResult) => { const exists = state.watchlist.some(v => secid(v) === secid(item)); const list = exists ? state.watchlist.map(v => secid(v) === secid(item) ? { ...v, hidden: false, name: item.name } : v) : [...state.watchlist, item]; onSave({ watchlist: list }); onClose() }
-  return <div className="overlay"><section className="panel add-panel"><div className="panel-head"><h2>添加自选</h2><button onClick={onClose}><X size={18}/></button></div><div className="searchbox"><Search size={16}/><input autoFocus value={query} onChange={e => search(e.target.value)} placeholder="输入名称、600519、HK00700"/></div><div className="results">{loading && <p>搜索中…</p>}{results.map(v => <button key={secid(v)} onClick={() => add(v)}><span className="market-badge">{displayMarket(v.market)}</span><b>{v.name}</b><small>{v.code}</small><Plus size={16}/></button>)}{query && !loading && !results.length && <p>未找到匹配标的</p>}</div><p className="fineprint">支持沪深 6 位代码，以及 HK + 港股代码。</p></section></div>
+  const hidden = state.watchlist.filter(item => item.hidden)
+  const restore = (item: WatchItem) => onSave({ watchlist: state.watchlist.map(value => secid(value) === secid(item) ? { ...value, hidden: false } : value) })
+  return <div className="overlay"><section className="panel add-panel"><div className="panel-head"><h2>添加自选</h2><button onClick={onClose}><X size={18}/></button></div><div className="searchbox"><Search size={16}/><input autoFocus value={query} onChange={e => search(e.target.value)} placeholder="输入名称、600519、HK00700"/></div>{!query && hidden.length > 0 && <div className="hidden-stocks"><header>已隐藏自选</header>{hidden.map(item => <button key={secid(item)} onClick={() => restore(item)}><Eye size={13}/><span>{item.name}</span><small>{item.code}</small><b>恢复</b></button>)}</div>}<div className="results">{loading && <p>搜索中…</p>}{results.map(v => <button key={secid(v)} onClick={() => add(v)}><span className="market-badge">{displayMarket(v.market)}</span><b>{v.name}</b><small>{v.code}</small><Plus size={16}/></button>)}{query && !loading && !results.length && <p>未找到匹配标的</p>}</div><p className="fineprint">支持沪深 6 位代码及港股代码；隐藏的股票可在这里直接恢复。</p></section></div>
 }
 
 function HotRankPanel({ items, state, onSave, onClose }: { items: HotRankItem[]; state: AppState; onSave(p: Partial<AppState>): void; onClose(): void }) {
