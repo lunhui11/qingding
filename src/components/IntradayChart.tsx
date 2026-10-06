@@ -21,7 +21,7 @@ export default function IntradayChart({ points, previousClose, market }: { point
   const x = (point: IntradayPoint) => sessionPosition(point.time, market) * PLOT_RIGHT
   const y = (value: number) => PRICE_BOTTOM - (value - min) / range * (PRICE_BOTTOM - PRICE_TOP)
   const line = (pick: (point: IntradayPoint) => number) => points.map((point, index) => `${index ? 'L' : 'M'}${x(point).toFixed(1)},${y(pick(point)).toFixed(1)}`).join(' ')
-  const maxVolume = Math.max(...points.map(point => point.volume), 1); const latest = points.at(-1)!; const active = hovered == null ? latest : points[hovered]
+  const maxVolume = Math.max(...points.map(point => point.volume), 1); const latest = points.at(-1)!; const active = hovered == null ? latest : points[Math.min(hovered, points.length - 1)]
   const labels = market === 'HK' ? ['09:30', '12:00/13:00', '16:00'] : ['09:30', '11:30/13:00', '15:00']
   const inspect = (clientX: number, left: number, width: number) => {
     const chartX = Math.max(0, Math.min(PLOT_RIGHT, (clientX - left) / width * WIDTH))
@@ -35,6 +35,6 @@ export default function IntradayChart({ points, previousClose, market }: { point
     {points.map(point => { const height = Math.max(1, point.volume / maxVolume * (VOLUME_BOTTOM - VOLUME_TOP)); return <rect className={point.close >= point.open ? 'volume-up' : 'volume-down'} key={point.time} x={x(point)} y={VOLUME_BOTTOM - height} width="1" height={height}/> })}
     <path className="price-path" d={line(point => point.close)}/><path className="average-path" d={line(point => point.average)}/>
     {activeX != null && <g className="chart-crosshair"><line x1={activeX} x2={activeX} y1={PRICE_TOP} y2={VOLUME_BOTTOM}/><circle className="price-dot" cx={activeX} cy={y(active.close)} r="2.5"/><circle className="average-dot" cx={activeX} cy={y(active.average)} r="2.5"/></g>}
-    <text className="time-label" x="0" y="149">{labels[0]}</text><text className="time-label" x={PLOT_RIGHT / 2} y="149" textAnchor="middle">{labels[1]}</text><text className="time-label" x={PLOT_RIGHT} y="149" textAnchor="end">{labels[2]}</text>
+    <text className="time-label" x="0" y="149">{labels[0]}</text><text className="time-label" x={PLOT_RIGHT * (market === 'HK' ? 150 / 330 : .5)} y="149" textAnchor="middle">{labels[1]}</text><text className="time-label" x={PLOT_RIGHT} y="149" textAnchor="end">{labels[2]}</text>
   </svg></div>
 }

@@ -5,6 +5,14 @@
 .quick-profit { margin-left: auto; padding-left: 4px; font-size: 8px; font-weight: 600; white-space: nowrap; }
 .compact-metrics { display: none; }
 .stock-card.keyboard-focus { border-color: var(--teal); box-shadow: inset 0 0 0 1px #55d6be33; }
+.settings-panel label.shortcut-field { grid-template-columns: 80px 1fr; }
+.apply-shortcuts { padding: 7px 12px; border: 1px solid #44665e; background: #245047; color: #bde4db; border-radius: 5px; cursor: pointer; }
+.app-error { flex: none; margin: 5px 12px; font-size: 10px; }
+.fund-radar { margin: 8px 0; padding: 9px; border: 1px solid #2a363e; border-radius: 7px; background: #12191e; }
+.fund-radar header { margin-bottom: 5px; }.fund-radar header span { font-size: 11px; font-weight: 600; }.fund-radar header small { display: block; margin-top: 2px; color: #697680; font-size: 9px; }
+.fund-radar-row { display: grid; grid-template-columns: 84px 70px 1fr; align-items: center; min-height: 27px; border-top: 1px solid #222d34; font-size: 10px; }.fund-radar-row > span { color: #89969f; }.fund-radar-row > b { font-size: 11px; }.fund-radar-row > em { color: #65727c; font-style: normal; text-align: right; }
+.fund-radar details { margin-top: 5px; color: #697680; font-size: 9px; }.fund-radar summary { cursor: pointer; }.fund-radar details p { margin: 6px 0 3px; line-height: 1.5; }.fund-radar details small { color: #56636c; }
+.app-shell[data-theme="light"] .fund-radar { border-color: #d6e0e4; background: #f5f8f9; }.app-shell[data-theme="light"] .fund-radar-row { border-color: #e2e8eb; }.app-shell[data-theme="light"] .fund-radar-row > span { color: #5e6e75; }
 .app-shell.compact .toolbar { padding-top: 10px; padding-bottom: 8px; }
 .app-shell.compact .toolbar h1 { font-size: 17px; }
 .app-shell.compact .column-head { margin-bottom: 3px; }
@@ -18,3 +26,5 @@
 .app-shell.compact .stock-card:not(.expanded) .quote b { font-size: 15px; }
 .app-shell.compact .stock-card:not(.expanded) .quote span { font-size: 10px; }
 .app-shell[data-theme="light"] .scan-summary select { border-color: #d1dce0; background: #f5f7f8; color: #53636b; }
+.app-shell[data-colors="global"] { --rise: #34c994; --fall: #ff6673; }
+.app-shell[data-colors="global"][data-theme="light"] { --rise: #16885c; --fall: #d83b4e; }

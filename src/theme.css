@@ -80,20 +80,16 @@
 .app-shell[data-theme="light"] .metric-grid b { color: #334148; }
 .app-shell[data-theme="light"] .signal-chip { background: #e7edef; color: #5e6e75; }
 .app-shell[data-theme="light"] .signal-chip.hot { background: #fff0df; color: #a85b18; }
-.app-shell[data-theme="light"] .split-radar { border-color: #d6e0e4; background: #f6f8f9; }
-.app-shell[data-theme="light"] .split-radar header { color: #526168; }
-.app-shell[data-theme="light"] .split-radar header small,
-.app-shell[data-theme="light"] .split-radar p,
-.app-shell[data-theme="light"] .split-signal em { color: #77858c; }
 .app-shell[data-theme="light"] .hot-list > div { border-color: #e1e8eb; }
 .app-shell[data-theme="light"] .hot-list > div > span small { color: #77858c; }
 .app-shell[data-theme="light"] .hot-list > div > button { border-color: #d1dde1; background: #f3f6f7; color: #197765; }
-.app-shell[data-theme="light"] .split-summary { color: #68777e; }
-.app-shell[data-theme="light"] .split-summary span { background: #edf2f4; }
 .app-shell[data-theme="light"] .ma-toolbar .chart-toggle { border-color: #d2dde1; color: #64747b; }
 .app-shell[data-theme="light"] .kline-widget.collapsed { border-color: #dce4e7; }
 .app-shell[data-theme="light"] .flow-window-grid div { background: #f2f5f6; }
 .app-shell[data-theme="light"] .flow-window-grid span { color: #75838a; }
+.app-shell[data-theme="light"] .top-book>div,.app-shell[data-theme="light"] .trade-tape { background: #f4f7f8; border-color: #d7e0e4; }
+.app-shell[data-theme="light"] .trade-head { border-color: #dce4e7; }.app-shell[data-theme="light"] .trade-rows>div:nth-child(even) { background: rgba(40,60,70,.035); }
+.app-shell[data-theme="light"] .institution-activity { border-color: #d6e0e4; background: #f5f8f9; }.app-shell[data-theme="light"] .institution-activity header span,.app-shell[data-theme="light"] .activity-metrics b { color: #425159; }.app-shell[data-theme="light"] .activity-track { background: #dfe7ea; }
 .app-shell[data-theme="light"] .sector-list > div { border-color: #e1e8eb; }
 .app-shell[data-theme="light"] .sector-list > div > span small { color: #77858c; }
 .app-shell[data-theme="light"] .sector-row,

@@ -3,5 +3,6 @@
     "target": "ES2022", "module": "Node16", "moduleResolution": "Node16", "outDir": "dist-electron",
     "rootDir": "electron", "strict": true, "esModuleInterop": true, "skipLibCheck": true, "types": ["node"]
   },
-  "include": ["electron/**/*.ts"]
+  "include": ["electron/**/*.ts"],
+  "exclude": ["electron/**/*.test.ts"]
 }

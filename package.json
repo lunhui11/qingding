@@ -1,6 +1,6 @@
 {
   "name": "market-float",
-  "version": "1.10.0",
+  "version": "1.13.2",
   "private": true,
   "description": "A discreet A-share and Hong Kong stock ticker for Windows",
   "main": "dist-electron/main.js",
@@ -11,7 +11,7 @@
     "build": "tsc -p tsconfig.main.json && vite build",
     "test": "vitest run --exclude dist-electron/** --exclude node_modules/**",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
-    "dist": "npm run build && electron-builder --win portable"
+    "dist": "npm run build && electron-builder --win nsis"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",
@@ -41,17 +41,24 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "!dist-electron/**/*.test.js",
+      "build/icon.png",
       "package.json"
     ],
     "win": {
       "target": [
-        "portable"
+        "nsis"
       ],
-      "artifactName": "轻盯-便携版-${version}.${ext}",
+      "artifactName": "轻盯-安装版-${version}.${ext}",
       "icon": "build/icon.ico"
     },
-    "portable": {
-      "artifactName": "轻盯-便携版-${version}.${ext}"
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "轻盯",
+      "deleteAppDataOnUninstall": false
     }
   }
 }

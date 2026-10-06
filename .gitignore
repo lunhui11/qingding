@@ -9,5 +9,8 @@ Thumbs.db
 .env.*
 !.env.example
 coverage/
+outputs/
+*-源码-*.zip
 .pack-cache/
 .electron-dist/
+.cache/
