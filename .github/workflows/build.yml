@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to upload and publish (for example v1.13.3); leave empty to build only'
+        required: false
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -16,6 +24,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Validate release version
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          test "$RELEASE_TAG" = "v$version"
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
@@ -24,3 +40,25 @@ jobs:
         with:
           name: market-float-windows-installer
           path: release/*.exe
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: market-float-windows-installer
+          path: release
+      - name: Upload and publish installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          cd release
+          sha256sum ./*.exe > SHA256SUMS.txt
+          gh release upload "$RELEASE_TAG" ./*.exe SHA256SUMS.txt --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
