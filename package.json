@@ -11,7 +11,7 @@
     "build": "tsc -p tsconfig.main.json && vite build",
     "test": "vitest run --exclude \"dist-electron/**\" --exclude \"node_modules/**\"",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
-    "dist": "npm run build && electron-builder --win nsis"
+    "dist": "npm run build && electron-builder --win nsis --publish never"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",

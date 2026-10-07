@@ -15,6 +15,11 @@
 - NSIS 安装包和内嵌应用归档通过 7-Zip 完整性检查。
 - 当前云端为 Linux 环境，尚未进行 Windows 实机安装和界面回归。
 
+## 发布构建
+
+- 显式禁用 electron-builder 隐式发布；安装包由手动触发的 GitHub Actions 发布任务上传到 Release。
+- 发布前校验标签与 package.json 版本一致；普通推送和 PR 只运行构建，不发布 Release。
+
 ## 下载
 
 GitHub Release 提供 Windows x64 安装版，可选择安装目录，并创建桌面和开始菜单快捷方式。
