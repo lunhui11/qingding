@@ -84,7 +84,7 @@ export async function fetchQuotes(items: WatchItem[]): Promise<Quote[]> {
   const rows = objectRows(json?.data?.diff)
   if (!rows.length) return fetchBackupQuotes(items)
   const now = new Date().toISOString()
-  return items.map(item => {
+  const quotes: Quote[] = items.map(item => {
     const expectedMarket = item.market === 'HK' ? 116 : item.market === 'SH' ? 1 : 0
     const row = rows.find(r => Number(r.f13) === expectedMarket && String(r.f12).padStart(item.market === 'HK' ? 5 : 6, '0') === item.code.padStart(item.market === 'HK' ? 5 : 6, '0'))
     if (!row) return { ...item, price: null, previousClose: null, change: null, changePercent: null, mainNetInflow: null, mainNetRatio: null, superLargeNet: null, largeNet: null, amount: null, volumeRatio: null, actualTurnoverRate: null, bid1Price: null, bid1Volume: null, ask1Price: null, ask1Volume: null, updatedAt: now, status: 'offline' as const }
@@ -96,6 +96,14 @@ export async function fetchQuotes(items: WatchItem[]): Promise<Quote[]> {
     // ulist/clist f20 is market capitalization, not ask volume. Book data is loaded separately.
     return { market: item.market, code: item.code, name: typeof row.f14 === 'string' ? row.f14 : item.name, price, previousClose: scaled(row.f18, 1), change: scaled(row.f4, 1), changePercent: scaled(row.f3, 1), mainNetInflow: hasFunds ? scaled(row.f62, 1) : null, mainNetRatio: hasFunds ? scaled(row.f184, 1) : null, superLargeNet: hasFunds ? scaled(row.f66, 1) : null, largeNet: hasFunds ? scaled(row.f72, 1) : null, amount: scaled(row.f6, 1), volumeRatio: scaled(row.f10, 1), actualTurnoverRate, bid1Price: null, bid1Volume: null, ask1Price: null, ask1Volume: null, updatedAt: timestamp, status: price == null || Date.now() - Date.parse(timestamp) > 120000 ? 'delayed' as const : 'live' as const }
   })
+  const missing = items.filter((_, index) => quotes[index].price == null)
+  if (missing.length) {
+    try {
+      const backup = new Map((await fetchBackupQuotes(missing)).map(quote => [toSecid(quote), quote]))
+      return quotes.map(quote => quote.price == null && backup.get(toSecid(quote))?.price != null ? backup.get(toSecid(quote))! : quote)
+    } catch { /* Keep valid primary quotes when the backup source also fails. */ }
+  }
+  return quotes
 }
 
 const tradeCache = new Map<string, { date: string; trades: TradePrint[] }>()
@@ -119,7 +127,7 @@ export async function fetchDetail(item: WatchItem, scope: 'full' | 'live' | 'his
   const klineRows = stringRows(klineResult.status === 'fulfilled' ? klineResult.value?.data?.klines : null)
   const incoming = tradeRows.map(v => { const [time, price, volume, , side] = v.split(','); return { time, price: numberOrNull(price), volume: numberOrNull(volume), side: Number(side) } }).filter(v => Number.isFinite(tradeSeconds(v.time)) && v.price != null && v.price > 0 && v.volume != null && v.volume > 0 && [1, 2, 4].includes(v.side)) as TradePrint[]
   const book = bookResult.status === 'fulfilled' && bookResult.value[0]?.status !== 'offline' ? bookResult.value[0] : undefined
-  const date = book?.updatedAt.slice(0, 10) ?? trends.at(-1)?.slice(0, 10) ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+  const date = (book ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date(book.updatedAt)) : undefined) ?? trends.at(-1)?.slice(0, 10) ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
   const previous = tradeCache.get(secid)
   const trades = incoming.length ? mergeTradeSamples(previous?.date === date ? previous.trades : [], incoming) : []
   if (trades.length) { tradeCache.set(secid, { date, trades }); if (tradeCache.size > 30) tradeCache.delete(tradeCache.keys().next().value!) }

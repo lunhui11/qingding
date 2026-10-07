@@ -15,9 +15,9 @@ describe('alerts', () => {
 
 describe('trading sessions', () => {
   it('recognizes CN/HK common trading windows and weekends', () => {
-    expect(isTradingTime(new Date('2026-09-07T10:00:00'))).toBe(true)
-    expect(isTradingTime(new Date('2026-09-07T12:30:00'))).toBe(false)
-    expect(isTradingTime(new Date('2026-09-06T10:00:00'))).toBe(false)
+    expect(isTradingTime(new Date('2026-09-07T10:00:00+08:00'))).toBe(true)
+    expect(isTradingTime(new Date('2026-09-07T12:30:00+08:00'))).toBe(false)
+    expect(isTradingTime(new Date('2026-09-06T10:00:00+08:00'))).toBe(false)
   })
 })
 describe('position profit', () => {
@@ -31,6 +31,11 @@ describe('position profit', () => {
     expect(result.grossAmount).toBe(1000)
     expect(result.fees).toBe(13)
     expect(result.amount).toBe(987)
+  })
+  it('uses Shanghai dates and hours for UTC inputs across day boundaries', () => {
+    expect(isTradingTime(new Date('2026-09-07T02:00:00Z'))).toBe(true)
+    expect(isTradingTime(new Date('2026-09-07T04:30:00Z'))).toBe(false)
+    expect(isTradingTime(new Date('2026-09-04T17:00:00Z'))).toBe(false)
   })
   it('rejects nonfinite position inputs and does not charge an empty position', () => {
     expect(calculatePositionProfit(12, 10, Infinity)).toBeNull()

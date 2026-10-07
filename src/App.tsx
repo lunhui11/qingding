@@ -8,11 +8,11 @@ import Decoy from './components/Decoy'
 import SettingsPanel from './components/SettingsPanel'
 import Candlestick from './components/Candlestick'
 import IntradayChart from './components/IntradayChart'
-import { mergeDetail, mergeQuote } from './data'
+import { mergeAlertRules, mergeDetail, mergeQuote } from './data'
 
 const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05, compactMode: false, positionsFirst: true, watchSortMode: 'manual', largeOrderThreshold: 200000 } }
 const exactMoney = (value: number) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(value))}`
-const dataTime = (time?: string) => time && Number.isFinite(Date.parse(time)) ? new Date(time).toLocaleString('zh-CN', { hour12: false }) : '暂无'
+const dataTime = (time?: string) => time && Number.isFinite(Date.parse(time)) ? new Date(time).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '暂无'
 
 export default function App() {
   const [state, setState] = useState<AppState>(fallbackState)
@@ -163,7 +163,7 @@ export default function App() {
   }, [decoy, settingsOpen, addOpen, hotOpen, sectorOpen, alertFor, visibleItems, focused, expanded])
 
   const backupData = Object.values(quotes).some(v => v.status === 'delayed')
-  const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} ${backupData ? '延迟/备用' : '更新'}` : '正在连接'
+  const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} ${backupData ? '延迟/备用' : '更新'}` : '正在连接'
 
   const settingsPanel = settingsOpen && <SettingsPanel value={state.settings} onChange={updateSettings} onShortcuts={applyShortcuts} onClose={() => setSettingsOpen(false)} shortcutError={shortcutError} notesOnly={decoy}/>
   if (!ready) return <main className="decoy-v2"><h1>今日规划</h1><p>正在读取本机便签…</p>{saveError && <><p className="error">{saveError}</p><button onClick={() => window.location.reload()}>重新读取</button></>}</main>
@@ -215,7 +215,7 @@ export default function App() {
     {addOpen && <AddStock state={state} onSave={save} onClose={() => setAddOpen(false)}/>} 
     {hotOpen && <HotRankPanel items={hotRanks} state={state} onSave={save} onClose={() => setHotOpen(false)}/>} 
     {sectorOpen && <SectorRankPanel items={sectorRanks} state={state} onSave={save} onClose={() => setSectorOpen(false)}/>}
-    {alertFor && <AlertEditor stock={state.watchlist.find(v => secid(v) === alertFor)!} alerts={state.alerts.filter(a => a.secid === alertFor)} onSave={alerts => save({ alerts: [...state.alerts.filter(a => a.secid !== alertFor), ...alerts] })} onClose={() => setAlertFor(undefined)}/>} 
+    {alertFor && <AlertEditor stock={state.watchlist.find(v => secid(v) === alertFor)!} alerts={state.alerts.filter(a => a.secid === alertFor)} onSave={alerts => save(current => ({ alerts: mergeAlertRules(current.alerts, alertFor, alerts) }))} onClose={() => setAlertFor(undefined)}/>}
   </div>
 }
 
@@ -282,8 +282,8 @@ function HotRankPanel({ items, state, onSave, onClose }: { items: HotRankItem[];
 }
 
 function AlertEditor({ stock, alerts, onSave, onClose }: { stock: WatchItem; alerts: PriceAlert[]; onSave(v: PriceAlert[]): void; onClose(): void }) {
-  const [metric, setMetric] = useState<PriceAlert['metric']>('priceAbove'); const [threshold, setThreshold] = useState(''); const [rules, setRules] = useState(alerts)
-  const persist = (next: PriceAlert[]) => { setRules(next); onSave(next) }
+  const [metric, setMetric] = useState<PriceAlert['metric']>('priceAbove'); const [threshold, setThreshold] = useState(''); const rules = alerts
+  const persist = (next: PriceAlert[]) => onSave(next)
   const add = () => { const n = Number(threshold); if (!Number.isFinite(n) || !threshold) return; persist([...rules, { id: crypto.randomUUID(), secid: secid(stock), metric, threshold: n, enabled: true }]); setThreshold('') }
   return <div className="overlay"><section className="panel alert-panel"><div className="panel-head"><div><small>{stock.code}</small><h2>{stock.name} · 提醒</h2></div><button onClick={onClose}><X size={18}/></button></div><div className="alert-form"><select value={metric} onChange={e => setMetric(e.target.value as PriceAlert['metric'])}><option value="priceAbove">价格高于</option><option value="priceBelow">价格低于</option><option value="changeAbove">涨跌幅高于</option><option value="changeBelow">涨跌幅低于</option></select><input type="number" step="0.01" value={threshold} onChange={e => setThreshold(e.target.value)} placeholder="阈值"/><button onClick={add}>添加提醒</button></div>{rules.length > 0 && <div className="existing-alerts">{rules.map(a => <div key={a.id}><input type="checkbox" checked={a.enabled} onChange={e => persist(rules.map(v => v.id === a.id ? { ...v, enabled: e.target.checked } : v))}/><span>{a.metric.includes('price') ? '价格' : '涨跌幅'} {a.metric.includes('Above') ? '≥' : '≤'} {a.threshold}{a.metric.includes('change') ? '%' : ''}</span><button onClick={() => persist(rules.filter(v => v.id !== a.id))}><Trash2 size={13}/></button></div>)}</div>}<p className="fineprint">条件从未满足变为满足时提醒，5 分钟内不会重复通知。</p></section></div>
 }

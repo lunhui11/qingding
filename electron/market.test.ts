@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+vi.mock('electron', () => ({ net: {}, session: {} }))
 import { buildIntraday, estimateInstitutionActivity, estimateQuantActivity, estimateRecentMainFlow, labelSectorLeaders, marketFromId, mergeTradeSamples, parseDirectCode, parseTencentQuotes, recentNetFlow, toSecid } from './market'
 import type { Quote } from './types'
 

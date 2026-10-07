@@ -1,4 +1,12 @@
-import type { DetailData, Quote } from './types'
+import type { DetailData, PriceAlert, Quote } from './types'
+
+export function mergeAlertRules(current: PriceAlert[], stockId: string, edited: PriceAlert[]): PriceAlert[] {
+  const latest = new Map(current.filter(rule => rule.secid === stockId).map(rule => [rule.id, rule]))
+  return [...current.filter(rule => rule.secid !== stockId), ...edited.filter(rule => rule.secid === stockId).map(rule => {
+    const lastTriggered = latest.get(rule.id)?.lastTriggered
+    return lastTriggered != null && (rule.lastTriggered == null || lastTriggered > rule.lastTriggered) ? { ...rule, lastTriggered } : rule
+  })]
+}
 
 export function mergeQuote(loaded: Quote, previous?: Quote): Quote {
   if (!previous) return loaded
@@ -17,10 +25,13 @@ export function mergeQuote(loaded: Quote, previous?: Quote): Quote {
 export function mergeDetail(loaded: DetailData, previous?: DetailData): DetailData {
   const next = { ...loaded }
   if (!previous) return next
-  for (const key of ['intraday', 'price', 'averagePrice', 'klines', 'capital'] as const) {
+  const sameDay = !loaded.tradeDate || !previous.tradeDate || loaded.tradeDate === previous.tradeDate
+  for (const key of ['klines', 'capital'] as const) {
     if (!next[key].length) (next[key] as unknown[]) = previous[key]
   }
-  const sameDay = !loaded.tradeDate || !previous.tradeDate || loaded.tradeDate === previous.tradeDate
+  if (sameDay) for (const key of ['intraday', 'price', 'averagePrice'] as const) {
+    if (!next[key].length) (next[key] as unknown[]) = previous[key]
+  }
   if (!loaded.trades.length && sameDay) {
     next.trades = previous.trades; next.minuteCapital = previous.minuteCapital
     next.institutionActivity = previous.institutionActivity; next.quantActivity = previous.quantActivity
@@ -29,8 +40,8 @@ export function mergeDetail(loaded: DetailData, previous?: DetailData): DetailDa
     next.flowCoverageMinutes = previous.flowCoverageMinutes
     next.tradesUpdatedAt = previous.tradesUpdatedAt ?? previous.updatedAt
   } else next.tradesUpdatedAt = loaded.trades.length ? loaded.updatedAt : undefined
-  next.book = loaded.book ?? previous.book
+  next.book = loaded.book ?? (sameDay ? previous.book : undefined)
   // An all-empty response must not make retained charts look newly updated.
-  if (!loaded.intraday.length && !loaded.klines.length && !loaded.capital.length && !loaded.trades.length && !loaded.book) next.updatedAt = previous.updatedAt
+  if (sameDay && !loaded.intraday.length && !loaded.klines.length && !loaded.capital.length && !loaded.trades.length && !loaded.book) next.updatedAt = previous.updatedAt
   return next
 }

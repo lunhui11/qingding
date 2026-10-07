@@ -15,9 +15,10 @@ export const directionClass = (value: number | null, _settings: Settings) => {
   return up ? 'rise' : 'fall'
 }
 export const isTradingTime = (date = new Date()) => {
-  const local = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
-  const day = local.getDay(); if (day === 0 || day === 6) return false
-  const minutes = local.getHours() * 60 + local.getMinutes()
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
+  const value = (type: string) => parts.find(part => part.type === type)?.value
+  if (['Sat', 'Sun'].includes(value('weekday') ?? '')) return false
+  const minutes = Number(value('hour')) * 60 + Number(value('minute'))
   return (minutes >= 570 && minutes < 720) || (minutes >= 780 && minutes < 960)
 }
 export const alertTriggered = (alert: PriceAlert, quote: Quote) => {

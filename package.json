@@ -1,6 +1,6 @@
 {
   "name": "market-float",
-  "version": "1.13.2",
+  "version": "1.13.3",
   "private": true,
   "description": "A discreet A-share and Hong Kong stock ticker for Windows",
   "main": "dist-electron/main.js",
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "concurrently -k \"vite\" \"tsc -p tsconfig.main.json --watch\" \"wait-on tcp:5173 dist-electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
     "build": "tsc -p tsconfig.main.json && vite build",
-    "test": "vitest run --exclude dist-electron/** --exclude node_modules/**",
+    "test": "vitest run --exclude \"dist-electron/**\" --exclude \"node_modules/**\"",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit",
     "dist": "npm run build && electron-builder --win nsis"
   },
