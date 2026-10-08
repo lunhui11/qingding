@@ -1,5 +1,5 @@
 export type Market = 'SH' | 'SZ' | 'HK'
-export interface WatchItem { market: Market; code: string; name: string; hidden?: boolean; costPrice?: number; holdingLots?: number; lotSize?: number }
+export interface WatchItem { market: Market; code: string; name: string; hidden?: boolean; groupId?: string; costPrice?: number; holdingLots?: number; lotSize?: number }
 export interface TrendPoint { time: string; value: number }
 export interface IntradayPoint { time: string; open: number; close: number; high: number; low: number; volume: number; amount: number; average: number }
 export interface InstitutionActivity { score: number | null; level: '样本不足' | '偏低' | '一般' | '活跃' | '高度活跃'; direction: 'inflow' | 'outflow' | 'neutral'; largeTradeAmount: number; netAmount: number; largeTradeRatio: number; largeTradeCount: number; activeMinuteRatio: number; sampleCount: number; coverageMinutes: number; confidence: number; threshold: number }
@@ -28,7 +28,8 @@ export interface Settings {
   commissionRate: number; minimumCommission: number; stampDutyRate: number;
   compactMode: boolean; positionsFirst: boolean; watchSortMode: WatchSortMode; largeOrderThreshold: number;
 }
-export interface AppState { watchlist: WatchItem[]; alerts: PriceAlert[]; todos: string; todoItems: TodoItem[]; todoLogs: TodoLog[]; settings: Settings; windowBounds?: { x: number; y: number; width: number; height: number } }
+export interface WatchGroup { id: string; name: string }
+export interface AppState { watchGroups: WatchGroup[]; watchlist: WatchItem[]; alerts: PriceAlert[]; todos: string; todoItems: TodoItem[]; todoLogs: TodoLog[]; settings: Settings; windowBounds?: { x: number; y: number; width: number; height: number } }
 export interface SearchResult { market: Market; code: string; name: string }
 
 export interface MarketFloatAPI {

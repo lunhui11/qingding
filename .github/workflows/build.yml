@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release tag to upload and publish (for example v1.13.3); leave empty to build only'
+        description: 'Release tag to upload and publish; leave empty to build only'
         required: false
         type: string
 
@@ -18,6 +18,8 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    outputs:
+      release_tag: ${{ steps.version.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,17 +27,24 @@ jobs:
           node-version: 22
           cache: npm
       - name: Validate release version
-        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+        id: version
         shell: bash
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
         run: |
           version=$(node -p "require('./package.json').version")
-          test "$RELEASE_TAG" = "v$version"
+          if [ -n "$REQUESTED_TAG" ]; then test "$REQUESTED_TAG" = "v$version"; fi
+          echo "release_tag=v$version" >> "$GITHUB_OUTPUT"
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run dist
+      - name: Packaged watchlist group UI regression
+        shell: pwsh
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          npx electron scripts/groups-smoke.cjs --packaged
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
           name: market-float-windows-installer
@@ -43,12 +52,13 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+    if: (github.event_name == 'workflow_dispatch' && inputs.release_tag != '') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release:'))
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: market-float-windows-installer
@@ -56,9 +66,13 @@ jobs:
       - name: Upload and publish installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
         run: |
+          version=${RELEASE_TAG#v}
           cd release
           sha256sum ./*.exe > SHA256SUMS.txt
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "轻盯 $version" --notes-file "../docs/RELEASE-$version.md" --draft --repo "$GITHUB_REPOSITORY"
+          fi
           gh release upload "$RELEASE_TAG" ./*.exe SHA256SUMS.txt --repo "$GITHUB_REPOSITORY"
           gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
