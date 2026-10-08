@@ -36,3 +36,27 @@ describe('configuration persistence', () => {
     expect(fs.readFileSync(file() + '.corrupt', 'utf8')).toBe('{')
   })
 })
+
+describe('watchlist group migration and persistence', () => {
+  it('migrates old configurations without losing holdings', () => {
+    const state = store.normalizeState({ watchlist: [{ market: 'SH', code: '600519', name: 'A', costPrice: 10, holdingLots: 5 }] })
+    expect(state.watchGroups).toEqual([])
+    expect(state.watchlist[0]).toMatchObject({ code: '600519', costPrice: 10, holdingLots: 5, groupId: undefined })
+  })
+  it('cleans malformed groups and orphaned memberships', () => {
+    const state = store.normalizeState({ watchGroups: [null, { id: 'long', name: ' 长线 ' }, { id: 'long', name: '重复标识' }, { id: 'other', name: '长线' }, { id: 'all', name: '保留标识' }, { id: 'blank', name: '' }], watchlist: [{ market: 'SH', code: '600519', name: 'A', groupId: 'long' }, { market: 'SZ', code: '000001', name: 'B', groupId: 'gone' }] })
+    expect(state.watchGroups).toEqual([{ id: 'long', name: '长线' }])
+    expect(state.watchlist.map(item => item.groupId)).toEqual(['long', undefined])
+  })
+  it('persists groups and stock membership across a fresh store load', async () => {
+    store.patchState({ watchGroups: [{ id: 'long', name: '长线' }], watchlist: [{ market: 'SH', code: '600519', name: 'A', groupId: 'long', costPrice: 10, holdingLots: 5 }] })
+    vi.resetModules(); const fresh = await import('./store')
+    expect(fresh.getState().watchGroups).toEqual([{ id: 'long', name: '长线' }])
+    expect(fresh.getState().watchlist[0]).toMatchObject({ groupId: 'long', costPrice: 10, holdingLots: 5 })
+  })
+  it('deleting groups normalizes saved stocks back to ungrouped', () => {
+    store.patchState({ watchGroups: [{ id: 'long', name: '长线' }], watchlist: [{ market: 'HK', code: '00700', name: 'A', groupId: 'long', hidden: true, costPrice: 10 }] })
+    const next = store.patchState({ watchGroups: [] })
+    expect(next.watchlist[0]).toMatchObject({ groupId: undefined, hidden: true, costPrice: 10 })
+  })
+})

@@ -9,8 +9,10 @@ import SettingsPanel from './components/SettingsPanel'
 import Candlestick from './components/Candlestick'
 import IntradayChart from './components/IntradayChart'
 import { mergeAlertRules, mergeDetail, mergeQuote } from './data'
+import { createWatchGroup, deleteWatchGroup, filterWatchGroup, moveStockToGroup, renameWatchGroup } from './groups'
+import { GroupBar, GroupManager } from './components/WatchGroups'
 
-const fallbackState: AppState = { watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05, compactMode: false, positionsFirst: true, watchSortMode: 'manual', largeOrderThreshold: 200000 } }
+const fallbackState: AppState = { watchGroups: [], watchlist: [], alerts: [], todos: '', todoItems: [], todoLogs: [], settings: { refreshMs: 1000, idleRefreshMs: 15000, opacity: .96, theme: 'dark', colorMode: 'cn', tickerShortcut: 'F8', notesShortcut: 'F7', hideShortcut: 'F9', notifications: true, launchAtLogin: false, locked: false, paused: false, commissionRate: 2.5, minimumCommission: 5, stampDutyRate: 0.05, compactMode: false, positionsFirst: true, watchSortMode: 'manual', largeOrderThreshold: 200000 } }
 const exactMoney = (value: number) => `${value > 0 ? '+' : value < 0 ? '-' : ''}${new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(value))}`
 const dataTime = (time?: string) => time && Number.isFinite(Date.parse(time)) ? new Date(time).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '暂无'
 
@@ -23,6 +25,8 @@ export default function App() {
   const [decoy, setDecoy] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [activeGroup, setActiveGroup] = useState('all')
+  const [groupsOpen, setGroupsOpen] = useState(false)
   const [alertFor, setAlertFor] = useState<string>()
   const [hotOpen, setHotOpen] = useState(false)
   const [hotRanks, setHotRanks] = useState<HotRankItem[]>([])
@@ -128,7 +132,7 @@ export default function App() {
     try { const result = await window.marketFloat.updateShortcut(ticker, notes, hide); setShortcutError(result.error); if (result.ok) await save(current => ({ settings: { ...current.settings, ...result.values } })) } catch { setShortcutError('快捷键应用失败，请重试') }
   }
   const visibleItems = useMemo(() => {
-    const list = state.watchlist.filter(item => !item.hidden)
+    const list = filterWatchGroup(state.watchlist, activeGroup)
     const position = (item: WatchItem) => item.costPrice != null && (item.holdingLots ?? 0) > 0
     const sortValue = (item: WatchItem) => {
       const id = secid(item); const quote = quotes[id]; const detail = details[id]
@@ -144,10 +148,16 @@ export default function App() {
       if (state.settings.positionsFirst && position(a) !== position(b)) return position(a) ? -1 : 1
       return state.settings.watchSortMode === 'manual' ? list.indexOf(a) - list.indexOf(b) : sortValue(b) - sortValue(a)
     })
-  }, [state.watchlist, state.settings, quotes, details])
+  }, [state.watchlist, state.settings, quotes, details, activeGroup])
 
   useEffect(() => {
-    if (decoy || settingsOpen || addOpen || hotOpen || sectorOpen || alertFor) return
+    if (activeGroup !== 'all' && activeGroup !== 'ungrouped' && !state.watchGroups.some(group => group.id === activeGroup)) setActiveGroup('all')
+    if (expanded && !visibleItems.some(item => secid(item) === expanded)) setExpanded(undefined)
+    if (focused && !visibleItems.some(item => secid(item) === focused)) setFocused(undefined)
+  }, [activeGroup, state.watchGroups, visibleItems, expanded, focused])
+
+  useEffect(() => {
+    if (decoy || settingsOpen || groupsOpen || addOpen || hotOpen || sectorOpen || alertFor) return
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       if (target?.closest('input,textarea,select,button,[contenteditable="true"]')) return
@@ -160,7 +170,7 @@ export default function App() {
       setFocused(id); setExpanded(id); window.setTimeout(() => document.querySelector(`[data-stock-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 0)
     }
     window.addEventListener('keydown', onKeyDown); return () => window.removeEventListener('keydown', onKeyDown)
-  }, [decoy, settingsOpen, addOpen, hotOpen, sectorOpen, alertFor, visibleItems, focused, expanded])
+  }, [decoy, settingsOpen, groupsOpen, addOpen, hotOpen, sectorOpen, alertFor, visibleItems, focused, expanded])
 
   const backupData = Object.values(quotes).some(v => v.status === 'delayed')
   const status = state.settings.paused ? '已暂停' : networkError ? '连接异常' : lastUpdated ? `${lastUpdated.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })} ${backupData ? '延迟/备用' : '更新'}` : '正在连接'
@@ -175,6 +185,7 @@ export default function App() {
       <div><span className="eyebrow">WATCHLIST</span><h1>自选行情</h1></div>
       <div className="tool-actions"><button className={state.settings.compactMode ? 'active' : ''} title="切换紧凑列表" onClick={() => updateSettings({ ...state.settings, compactMode: !state.settings.compactMode })}><Rows3 size={16}/></button><button title={state.settings.theme === 'dark' ? '切换亮色' : '切换暗色'} onClick={() => updateSettings({ ...state.settings, theme: state.settings.theme === 'dark' ? 'light' : 'dark' })}>{state.settings.theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}</button><button title="热门板块 TOP 10" onClick={() => setSectorOpen(true)}><LayoutGrid size={16}/></button><button title="热度榜 TOP 10" onClick={() => setHotOpen(true)}><Flame size={16}/></button><button className={state.settings.paused ? 'active' : ''} title={state.settings.paused ? '继续刷新' : '暂停刷新'} onClick={() => updateSettings({ ...state.settings, paused: !state.settings.paused })}>{state.settings.paused ? <Play size={16}/> : <Pause size={16}/>}</button><button className="add" onClick={() => setAddOpen(true)}><Plus size={17}/><span>添加</span></button></div>
     </div>
+    <GroupBar groups={state.watchGroups} items={state.watchlist} active={activeGroup} onSelect={setActiveGroup} onManage={() => setGroupsOpen(true)}/>
     {!!visibleItems.length && <div className="scan-summary"><span><Activity size={12}/>快捷排序</span><select title="自选排序" value={state.settings.watchSortMode} onChange={e => updateSettings({ ...state.settings, watchSortMode: e.target.value as AppState['settings']['watchSortMode'] })}><option value="manual">自选顺序</option><option value="change">涨幅</option><option value="mainFlow">主力净流入</option><option value="flow5m">5分钟资金</option><option value="flow10m">10分钟资金</option><option value="volumeRatio">量比</option><option value="profit">持仓盈亏</option></select></div>}
     <div className="column-head"><span>标的 / 资金动向</span><span>最新 / 涨跌</span></div>
     <section className="watchlist">
@@ -190,6 +201,7 @@ export default function App() {
             <div className="quote"><b>{fmtPrice(q?.price ?? null)}</b><span className={directionClass(change, state.settings)}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></div>
             {open ? <ChevronUp className="chevron" size={14}/> : <ChevronDown className="chevron" size={14}/>} 
           </button>
+          <label className="stock-group-picker">分组<select aria-label={`${item.name}所属分组`} value={item.groupId ?? ''} onChange={event => { const groupId = event.target.value || undefined; void save(current => moveStockToGroup(current, id, groupId)) }}><option value="">未分组</option>{state.watchGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
           {open && <div className="detail">
             <div className="top-book"><div className="ask-row"><span>卖一</span><b>{fmtPrice(book?.ask1Price ?? null)}</b><em>{book?.ask1Volume == null ? '—' : `${new Intl.NumberFormat('zh-CN').format(book.ask1Volume)} ${item.market === 'HK' ? '股' : '手'}`}</em></div><div className="bid-row"><span>买一</span><b>{fmtPrice(book?.bid1Price ?? null)}</b><em>{book?.bid1Volume == null ? '—' : `${new Intl.NumberFormat('zh-CN').format(book.bid1Volume)} ${item.market === 'HK' ? '股' : '手'}`}</em></div></div>
             <p className="flow-method-note">盘口时间：{dataTime(book?.updatedAt)} · 资金时间：{dataTime(q?.fundsUpdatedAt ?? (q?.mainNetInflow != null ? q.updatedAt : undefined))}{q?.status !== 'live' || q?.fundsUpdatedAt && q.fundsUpdatedAt !== q.updatedAt ? ' · 数据延迟/保留最后有效值' : ''}</p>
@@ -208,11 +220,12 @@ export default function App() {
           </div>}
         </article>
       })}
-      {!visibleItems.length && <div className="empty"><Eye size={26}/><b>还没有自选标的</b><span>添加股票后，会在这里低调刷新</span><button onClick={() => setAddOpen(true)}>添加第一只</button></div>}
+      {!visibleItems.length && <div className="empty"><Eye size={26}/><b>{activeGroup === 'all' ? '还没有自选标的' : '这个分组还没有股票'}</b><span>{activeGroup === 'all' ? '添加股票后，会在这里低调刷新' : '可从全部自选移动股票，或直接添加股票'}</span><button onClick={() => setAddOpen(true)}>添加股票</button></div>}
     </section>
     <footer className="app-footer"><span className={networkError || backupData ? 'warn' : ''}><i/>{state.settings.paused ? '刷新已暂停' : networkError ? '连接异常' : backupData ? '延迟/备用 · 请注意数据时间' : `${isTradingTime() ? state.settings.refreshMs / 1000 : 60} 秒刷新`}</span><span>主力 = 大单 + 超大单净额</span></footer>
     {settingsPanel}
-    {addOpen && <AddStock state={state} onSave={save} onClose={() => setAddOpen(false)}/>} 
+    {groupsOpen && <GroupManager groups={state.watchGroups} onCreate={(name, id) => save(current => createWatchGroup(current, name, id))} onRename={(id, name) => save(current => renameWatchGroup(current, id, name))} onDelete={id => save(current => deleteWatchGroup(current, id))} onClose={() => setGroupsOpen(false)}/>}
+    {addOpen && <AddStock state={state} targetGroupId={state.watchGroups.some(group => group.id === activeGroup) ? activeGroup : undefined} onSave={save} onClose={() => setAddOpen(false)}/>} 
     {hotOpen && <HotRankPanel items={hotRanks} state={state} onSave={save} onClose={() => setHotOpen(false)}/>} 
     {sectorOpen && <SectorRankPanel items={sectorRanks} state={state} onSave={save} onClose={() => setSectorOpen(false)}/>}
     {alertFor && <AlertEditor stock={state.watchlist.find(v => secid(v) === alertFor)!} alerts={state.alerts.filter(a => a.secid === alertFor)} onSave={alerts => save(current => ({ alerts: mergeAlertRules(current.alerts, alertFor, alerts) }))} onClose={() => setAlertFor(undefined)}/>}
@@ -265,14 +278,14 @@ function SectorRankPanel({ items, state, onSave, onClose }: { items: SectorRankI
   </section></div>
 }
 
-function AddStock({ state, onSave, onClose }: { state: AppState; onSave(p: Partial<AppState>): void; onClose(): void }) {
+function AddStock({ state, targetGroupId, onSave, onClose }: { state: AppState; targetGroupId?: string; onSave(p: Partial<AppState>): void; onClose(): void }) {
   const [query, setQuery] = useState(''); const [results, setResults] = useState<SearchResult[]>([]); const [loading, setLoading] = useState(false); const timer = useRef<number | undefined>(undefined)
   const requestVersion = useRef(0)
   useEffect(() => () => { clearTimeout(timer.current); requestVersion.current++ }, [])
   const search = (value: string) => { const version = ++requestVersion.current; setQuery(value); setResults([]); clearTimeout(timer.current); setLoading(Boolean(value.trim())); if (!value.trim()) return; timer.current = window.setTimeout(async () => { try { const loaded = await window.marketFloat.searchStocks(value); if (version === requestVersion.current) setResults(loaded) } catch { if (version === requestVersion.current) setResults([]) } finally { if (version === requestVersion.current) setLoading(false) } }, 300) }
-  const add = (item: SearchResult) => { const exists = state.watchlist.some(v => secid(v) === secid(item)); const list = exists ? state.watchlist.map(v => secid(v) === secid(item) ? { ...v, hidden: false, name: item.name } : v) : [...state.watchlist, item]; onSave({ watchlist: list }); onClose() }
+  const add = (item: SearchResult) => { const exists = state.watchlist.some(v => secid(v) === secid(item)); const list = exists ? state.watchlist.map(v => secid(v) === secid(item) ? { ...v, hidden: false, name: item.name, groupId: targetGroupId ?? v.groupId } : v) : [...state.watchlist, { ...item, groupId: targetGroupId }]; onSave({ watchlist: list }); onClose() }
   const hidden = state.watchlist.filter(item => item.hidden)
-  const restore = (item: WatchItem) => onSave({ watchlist: state.watchlist.map(value => secid(value) === secid(item) ? { ...value, hidden: false } : value) })
+  const restore = (item: WatchItem) => onSave({ watchlist: state.watchlist.map(value => secid(value) === secid(item) ? { ...value, hidden: false, groupId: targetGroupId ?? value.groupId } : value) })
   return <div className="overlay"><section className="panel add-panel"><div className="panel-head"><h2>添加自选</h2><button onClick={onClose}><X size={18}/></button></div><div className="searchbox"><Search size={16}/><input autoFocus value={query} onChange={e => search(e.target.value)} placeholder="输入名称、600519、HK00700"/></div>{!query && hidden.length > 0 && <div className="hidden-stocks"><header>已隐藏自选</header>{hidden.map(item => <button key={secid(item)} onClick={() => restore(item)}><Eye size={13}/><span>{item.name}</span><small>{item.code}</small><b>恢复</b></button>)}</div>}<div className="results">{loading && <p>搜索中…</p>}{results.map(v => <button key={secid(v)} onClick={() => add(v)}><span className="market-badge">{displayMarket(v.market)}</span><b>{v.name}</b><small>{v.code}</small><Plus size={16}/></button>)}{query && !loading && !results.length && <p>未找到匹配标的</p>}</div><p className="fineprint">支持沪深 6 位代码及港股代码；隐藏的股票可在这里直接恢复。</p></section></div>
 }
 

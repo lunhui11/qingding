@@ -1,5 +1,5 @@
 export type Market = 'SH' | 'SZ' | 'HK'
-export interface WatchItem { market: Market; code: string; name: string; hidden?: boolean; costPrice?: number; holdingLots?: number; lotSize?: number }
+export interface WatchItem { market: Market; code: string; name: string; hidden?: boolean; groupId?: string; costPrice?: number; holdingLots?: number; lotSize?: number }
 export interface TrendPoint { time: string; value: number }
 export interface IntradayPoint { time: string; open: number; close: number; high: number; low: number; volume: number; amount: number; average: number }
 export interface TradePrint { time: string; price: number; volume: number; side: 1 | 2 | 4 }
@@ -17,5 +17,6 @@ export type WatchSortMode = 'manual' | 'change' | 'mainFlow' | 'flow5m' | 'flow1
 export interface TodoItem { id: string; text: string; tag: string; completed: boolean; createdAt: string; completedAt?: string }
 export interface TodoLog { id: string; savedAt: string; items: TodoItem[] }
 export interface Settings { refreshMs: number; idleRefreshMs: number; opacity: number; theme: 'dark' | 'light'; colorMode: 'cn' | 'global'; tickerShortcut: string; notesShortcut: string; hideShortcut: string; notifications: boolean; launchAtLogin: boolean; locked: boolean; paused: boolean; commissionRate: number; minimumCommission: number; stampDutyRate: number; compactMode: boolean; positionsFirst: boolean; watchSortMode: WatchSortMode; largeOrderThreshold: number }
-export interface AppState { watchlist: WatchItem[]; alerts: PriceAlert[]; todos: string; todoItems: TodoItem[]; todoLogs: TodoLog[]; settings: Settings; windowBounds?: Electron.Rectangle }
+export interface WatchGroup { id: string; name: string }
+export interface AppState { watchGroups: WatchGroup[]; watchlist: WatchItem[]; alerts: PriceAlert[]; todos: string; todoItems: TodoItem[]; todoLogs: TodoLog[]; settings: Settings; windowBounds?: Electron.Rectangle }
 export interface SearchResult { market: Market; code: string; name: string }

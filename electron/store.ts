@@ -9,6 +9,7 @@ export const defaults: AppState = {
     { market: 'SH', code: '600519', name: '贵州茅台' },
     { market: 'HK', code: '00700', name: '腾讯控股' }
   ],
+  watchGroups: [],
   alerts: [],
   todos: '今日待办\n\n□ 整理项目进度\n□ 跟进本周数据\n□ 准备会议材料',
   todoItems: [],
@@ -39,14 +40,21 @@ export function normalizeState(input: unknown): AppState {
   for (const key of ['tickerShortcut', 'notesShortcut', 'hideShortcut'] as const) settings[key] = settings[key].trim() || defaults.settings[key]
   const validTodo = (item: any) => item && typeof item.id === 'string' && typeof item.text === 'string' && !item.id.startsWith('welcome-')
   const todos = (items: unknown) => Array.isArray(items) ? items.filter(validTodo).map(item => ({ ...item, tag: typeof item.tag === 'string' ? item.tag : '', completed: item.completed === true })) : []
+  const groupIds = new Set<string>(); const groupNames = new Set<string>()
+  const watchGroups = Array.isArray(saved.watchGroups) ? saved.watchGroups.flatMap(group => {
+    if (!group || typeof group.id !== 'string' || !group.id.trim() || group.id.length > 80 || ['all', 'ungrouped'].includes(group.id) || typeof group.name !== 'string') return []
+    const name = group.name.trim(); const key = name.toLowerCase()
+    if (!name || name.length > 20 || ['全部自选', '未分组'].includes(name) || groupIds.has(group.id) || groupNames.has(key)) return []
+    groupIds.add(group.id); groupNames.add(key); return [{ id: group.id, name }]
+  }) : []
   const seen = new Set<string>()
   const watchlist = Array.isArray(saved.watchlist) ? saved.watchlist.filter(item => {
     if (!item || !['SH', 'SZ', 'HK'].includes(item.market) || typeof item.code !== 'string' || !/^\d{1,6}$/.test(item.code) || typeof item.name !== 'string') return false
     if (item.market === 'HK' && item.code.length > 5) return false
     const id = `${item.market}.${item.code.padStart(item.market === 'HK' ? 5 : 6, '0')}`; if (seen.has(id)) return false; seen.add(id); return true
-  }).map(item => { const next = { ...item, code: item.code.padStart(item.market === 'HK' ? 5 : 6, '0'), hidden: item.hidden === true }; for (const key of ['costPrice', 'holdingLots', 'lotSize'] as const) if (next[key] != null && (!Number.isFinite(next[key]) || next[key]! < 0)) delete next[key]; return next }) : defaults.watchlist
+  }).map(item => { const next = { ...item, groupId: typeof item.groupId === 'string' && groupIds.has(item.groupId) ? item.groupId : undefined, code: item.code.padStart(item.market === 'HK' ? 5 : 6, '0'), hidden: item.hidden === true }; for (const key of ['costPrice', 'holdingLots', 'lotSize'] as const) if (next[key] != null && (!Number.isFinite(next[key]) || next[key]! < 0)) delete next[key]; return next }) : defaults.watchlist
   const bounds = saved.windowBounds
-  return { ...defaults, watchlist, settings,
+  return { ...defaults, watchGroups, watchlist, settings,
     todos: typeof saved.todos === 'string' ? saved.todos : '',
     alerts: Array.isArray(saved.alerts) ? saved.alerts.filter(rule => rule && typeof rule.id === 'string' && typeof rule.secid === 'string' && ['priceAbove', 'priceBelow', 'changeAbove', 'changeBelow'].includes(rule.metric) && Number.isFinite(rule.threshold)).map(rule => ({ ...rule, enabled: rule.enabled === true, lastTriggered: Number.isFinite(rule.lastTriggered) ? rule.lastTriggered : undefined })) : [],
     todoItems: todos(saved.todoItems),

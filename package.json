@@ -1,6 +1,6 @@
 {
   "name": "market-float",
-  "version": "1.13.3",
+  "version": "1.14.0",
   "private": true,
   "description": "A discreet A-share and Hong Kong stock ticker for Windows",
   "main": "dist-electron/main.js",
@@ -49,7 +49,7 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "轻盯-安装版-${version}.${ext}",
+      "artifactName": "MarketFloat-Setup-${version}-${arch}.${ext}",
       "icon": "build/icon.ico"
     },
     "nsis": {

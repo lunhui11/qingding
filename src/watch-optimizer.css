@@ -28,3 +28,14 @@
 .app-shell[data-theme="light"] .scan-summary select { border-color: #d1dce0; background: #f5f7f8; color: #53636b; }
 .app-shell[data-colors="global"] { --rise: #34c994; --fall: #ff6673; }
 .app-shell[data-colors="global"][data-theme="light"] { --rise: #16885c; --fall: #d83b4e; }
+
+.watch-groups { display: flex; align-items: center; gap: 6px; margin: 0 12px 8px; flex: none; min-width: 0; }
+.group-tabs { display: flex; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.group-tabs button, .manage-groups { flex: none; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); padding: 5px 7px; font-size: 10px; cursor: pointer; white-space: nowrap; }
+.group-tabs button.active { border-color: var(--teal); color: var(--teal); }.group-tabs small { margin-left: 5px; opacity: .6; }
+.stock-group-picker { display: flex; align-items: center; gap: 6px; padding: 0 12px 7px; font-size: 9px; color: var(--muted); }
+.stock-group-picker select { min-width: 0; max-width: 150px; border: 1px solid var(--line); border-radius: 4px; padding: 2px 5px; color: inherit; background: var(--panel); font-size: 10px; }
+.group-create, .group-manager-row form { display: flex; gap: 6px; margin: 9px 0; }.group-create input, .group-manager-row input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: inherit; padding: 7px; font-size: 12px; }
+.group-panel button { cursor: pointer; }.group-create button, .group-manager-row button { flex: none; border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; background: var(--panel); font-size: 10px; }.group-panel button:disabled { opacity: .5; cursor: default; }
+.group-manager-row { padding: 4px 0; border-bottom: 1px solid var(--line); }.group-delete-confirm { display: flex; align-items: center; gap: 6px; font-size: 10px; }.group-delete-confirm button { color: var(--fall); }.group-panel .error { margin: 5px 0; }
+.app-shell[data-theme="light"] .group-tabs button.active { color: #176f61; border-color: #176f61; }.app-shell[data-theme="light"] .stock-group-picker { color: #53636b; }
